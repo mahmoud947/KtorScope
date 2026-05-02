@@ -111,4 +111,4 @@ KtorScope is source-ready in this repository. Maven publishing configuration is 
 
 ## License
 
-Add the project license before distributing the library publicly.
+KtorScope is released under the [Apache License 2.0](LICENSE).
