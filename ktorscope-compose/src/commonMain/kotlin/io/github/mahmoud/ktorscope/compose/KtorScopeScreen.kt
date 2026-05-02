@@ -35,6 +35,7 @@ fun KtorScopeScreen(
     store: KtorScopeStore = KtorScopeStore.shared,
     modifier: Modifier = Modifier,
     themeMode: KtorScopeThemeMode = KtorScopeThemeMode.System,
+    onBackClicked: (() -> Unit)? = null,
     onThemeModeChange: (KtorScopeThemeMode) -> Unit = {},
     onCopy: (String) -> Unit = DefaultCopyHandler,
 ) {
@@ -52,6 +53,7 @@ fun KtorScopeScreen(
                     currentThemeMode = it
                     onThemeModeChange(it)
                 },
+                onBackClicked = onBackClicked,
                 onCopy = copyHandler,
             )
         }
@@ -64,6 +66,7 @@ private fun KtorScopeContent(
     modifier: Modifier,
     themeMode: KtorScopeThemeMode,
     onThemeModeChange: (KtorScopeThemeMode) -> Unit,
+    onBackClicked: (() -> Unit)?,
     onCopy: (String) -> Unit,
 ) {
     val transactions by store.transactions.collectAsState()
@@ -95,6 +98,7 @@ private fun KtorScopeContent(
                         stats = stats,
                         themeMode = themeMode,
                         onThemeModeChange = onThemeModeChange,
+                        onBackClicked = onBackClicked,
                         onClear = {
                             store.clear()
                             selectedId = null
@@ -130,6 +134,7 @@ private fun KtorScopeContent(
                             stats = stats,
                             themeMode = themeMode,
                             onThemeModeChange = onThemeModeChange,
+                            onBackClicked = onBackClicked,
                             onClear = { store.clear() },
                             onSelect = { selectedId = it.id },
                             modifier = Modifier.fillMaxSize(),

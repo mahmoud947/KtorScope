@@ -54,6 +54,7 @@ internal fun TransactionListPanel(
     stats: NetworkStats,
     themeMode: KtorScopeThemeMode,
     onThemeModeChange: (KtorScopeThemeMode) -> Unit,
+    onBackClicked: (() -> Unit)?,
     onClear: () -> Unit,
     onSelect: (NetworkTransaction) -> Unit,
     modifier: Modifier = Modifier,
@@ -63,6 +64,11 @@ internal fun TransactionListPanel(
         verticalArrangement = Arrangement.spacedBy(14.dp),
     ) {
         TopBar(themeMode = themeMode, onThemeModeChange = onThemeModeChange)
+        if (onBackClicked != null) {
+            OutlinedButton(onClick = onBackClicked, shape = RoundedCornerShape(14.dp)) {
+                Text("Back")
+            }
+        }
         StatsRow(stats)
         OutlinedTextField(
             value = query,

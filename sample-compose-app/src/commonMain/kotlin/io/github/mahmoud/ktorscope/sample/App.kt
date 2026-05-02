@@ -46,7 +46,7 @@ fun App() {
         var status by remember { mutableStateOf("Ready") }
 
         if (showInspector) {
-            KtorScopeScreen()
+            KtorScopeScreen(onBackClicked = { showInspector = false })
         } else {
             Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
                 Column(
