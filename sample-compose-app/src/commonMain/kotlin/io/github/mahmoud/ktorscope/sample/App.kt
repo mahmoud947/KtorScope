@@ -110,6 +110,24 @@ fun App() {
                                 status = runSampleCall { client.delete("https://httpbin.org/delete").body<String>() }
                             }
                         },
+                        onGraphQl = {
+                            scope.launch {
+                                status = runSampleCall {
+                                    client.post("https://httpbin.org/post") {
+                                        contentType(ContentType.Application.Json)
+                                        setBody(
+                                            """
+                                            {
+                                              "operationName": "ViewerProfile",
+                                              "query": "query ViewerProfile(${"$"}login: String!) { user(login: ${"$"}login) { id name login } }",
+                                              "variables": { "login": "octocat" }
+                                            }
+                                            """.trimIndent(),
+                                        )
+                                    }.body<String>()
+                                }
+                            }
+                        },
                     )
                     Button(onClick = { showInspector = true }) {
                         Text("Open KtorScope")
@@ -144,6 +162,7 @@ private fun RequestButtons(
     onPut: () -> Unit,
     onPatch: () -> Unit,
     onDelete: () -> Unit,
+    onGraphQl: () -> Unit,
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -158,6 +177,9 @@ private fun RequestButtons(
             Button(onClick = onPut, modifier = Modifier.weight(1f)) { Text("PUT") }
             Button(onClick = onPatch, modifier = Modifier.weight(1f)) { Text("PATCH") }
             Button(onClick = onDelete, modifier = Modifier.weight(1f)) { Text("DELETE") }
+        }
+        Button(onClick = onGraphQl, modifier = Modifier.fillMaxWidth()) {
+            Text("GraphQL")
         }
     }
 }

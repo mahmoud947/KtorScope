@@ -7,6 +7,5 @@ internal object KtorScopeRoadmap {
     // TODO: Add export logs support.
     // TODO: Add persistence for historical sessions.
     // TODO: Add request replay.
-    // TODO: Add GraphQL operation parsing.
     // TODO: Add WebSocket frame inspection.
 }

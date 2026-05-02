@@ -35,6 +35,7 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import io.github.mahmoud.ktorscope.core.NetworkTransaction
+import io.github.mahmoud.ktorscope.core.graphQlOperation
 import io.github.mahmoud.ktorscope.core.toCurlCommand
 
 @Composable
@@ -68,6 +69,7 @@ internal fun DetailsPanel(
         ) {
             when (selectedTab) {
                 0 -> {
+                    GraphQlSection(transaction, onCopy)
                     HeadersSection(transaction.request.headers, onCopy)
                     BodySection(transaction.request.body, transaction.request.bodyTruncated, onCopy)
                 }
@@ -95,6 +97,24 @@ internal fun DetailsPanel(
                     }
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun GraphQlSection(transaction: NetworkTransaction, onCopy: (String) -> Unit) {
+    val operation = transaction.graphQlOperation() ?: return
+    SectionCard("GraphQL", action = {
+        TextButton(onClick = { onCopy(operation.query) }) { Text("Copy query") }
+    }) {
+        Text(
+            "${operation.operationType.orEmpty()} ${operation.operationName.orEmpty()}".trim().ifBlank { "Anonymous operation" },
+            fontWeight = FontWeight.Bold,
+        )
+        Text(operation.query, style = MaterialTheme.typography.bodySmall, fontFamily = FontFamily.Monospace)
+        operation.variables?.takeIf { it.isNotBlank() && it != "null" }?.let { variables ->
+            Text("Variables", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold)
+            Text(variables.prettyJsonOrSelf(), style = MaterialTheme.typography.bodySmall, fontFamily = FontFamily.Monospace)
         }
     }
 }
