@@ -5,12 +5,14 @@ package io.github.mahmoud.ktorscope.ktor
 
 import io.github.mahmoud.ktorscope.core.BodyPreview
 import io.github.mahmoud.ktorscope.core.KtorScopeConfig
+import io.github.mahmoud.ktorscope.core.KtorScopePrettyPrintConfig
 import io.github.mahmoud.ktorscope.core.KtorScopeStore
 import io.github.mahmoud.ktorscope.core.NetworkError
 import io.github.mahmoud.ktorscope.core.NetworkRequest
 import io.github.mahmoud.ktorscope.core.NetworkResponse
 import io.github.mahmoud.ktorscope.core.NetworkTransaction
 import io.github.mahmoud.ktorscope.core.Redactor
+import io.github.mahmoud.ktorscope.core.prettyPrint
 import io.github.mahmoud.ktorscope.core.toBodyPreview
 import io.ktor.client.plugins.api.ClientPlugin
 import io.ktor.client.plugins.api.Send
@@ -36,6 +38,9 @@ val KtorScope: ClientPlugin<KtorScopePluginConfig> = createClientPlugin(
     createConfiguration = ::KtorScopePluginConfig,
 ) {
     val config = pluginConfig.toCoreConfig()
+    val prettyPrintEnabled = pluginConfig.prettyPrint
+    val prettyPrintConfig = pluginConfig.prettyPrintConfig
+    val logger = pluginConfig.logger
     val startedAtKey = AttributeKey<Long>("KtorScopeStartedAt")
     val requestKey = AttributeKey<NetworkRequest>("KtorScopeRequest")
 
@@ -77,24 +82,26 @@ val KtorScope: ClientPlugin<KtorScopePluginConfig> = createClientPlugin(
             null
         }
 
-        config.store.add(
-            NetworkTransaction(
-                id = newTransactionId(),
-                request = request,
-                response = NetworkResponse(
-                    statusCode = response.status.value,
-                    statusDescription = response.status.description,
-                    headers = Redactor.redactHeaders(
-                        headers = response.headers.toMap(),
-                        sensitiveHeaderNames = config.redactHeaders,
-                    ),
-                    body = responseBody?.value,
-                    bodyTruncated = responseBody?.truncated ?: false,
+        val transaction = NetworkTransaction(
+            id = newTransactionId(),
+            request = request,
+            response = NetworkResponse(
+                statusCode = response.status.value,
+                statusDescription = response.status.description,
+                headers = Redactor.redactHeaders(
+                    headers = response.headers.toMap(),
+                    sensitiveHeaderNames = config.redactHeaders,
                 ),
-                durationMillis = getTimeMillis() - startedAt,
-                createdAtMillis = startedAt,
+                body = responseBody?.value,
+                bodyTruncated = responseBody?.truncated ?: false,
             ),
+            durationMillis = getTimeMillis() - startedAt,
+            createdAtMillis = startedAt,
         )
+        config.store.add(transaction)
+        if (prettyPrintEnabled) {
+            logger(transaction.prettyPrint(prettyPrintConfig))
+        }
     }
 
     on(Send) { request ->
@@ -105,18 +112,20 @@ val KtorScope: ClientPlugin<KtorScopePluginConfig> = createClientPlugin(
                 val startedAt = request.attributes.getOrNull(startedAtKey) ?: getTimeMillis()
                 val networkRequest = request.attributes.getOrNull(requestKey)
                     ?: request.toNetworkRequest(content = null, config = config)
-                config.store.add(
-                    NetworkTransaction(
-                        id = newTransactionId(),
-                        request = networkRequest,
-                        error = NetworkError(
-                            type = cause::class.simpleName ?: "Throwable",
-                            message = cause.message,
-                        ),
-                        durationMillis = getTimeMillis() - startedAt,
-                        createdAtMillis = startedAt,
+                val transaction = NetworkTransaction(
+                    id = newTransactionId(),
+                    request = networkRequest,
+                    error = NetworkError(
+                        type = cause::class.simpleName ?: "Throwable",
+                        message = cause.message,
                     ),
+                    durationMillis = getTimeMillis() - startedAt,
+                    createdAtMillis = startedAt,
                 )
+                config.store.add(transaction)
+                if (prettyPrintEnabled) {
+                    logger(transaction.prettyPrint(prettyPrintConfig))
+                }
             }
             throw cause
         }
@@ -132,6 +141,9 @@ class KtorScopePluginConfig {
     var maxBodySize: Int = KtorScopeConfig.DEFAULT_MAX_BODY_SIZE
     var redactHeaders: Set<String> = KtorScopeConfig.DEFAULT_REDACT_HEADERS
     var store: KtorScopeStore = KtorScopeStore.shared
+    var prettyPrint: Boolean = false
+    var prettyPrintConfig: KtorScopePrettyPrintConfig = KtorScopePrettyPrintConfig()
+    var logger: (String) -> Unit = { message -> println(message) }
 
     fun toCoreConfig(): KtorScopeConfig = KtorScopeConfig(
         enabled = enabled,

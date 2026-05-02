@@ -21,6 +21,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import io.github.mahmoud.ktorscope.core.KtorScopePrettyPrintConfig
 import io.github.mahmoud.ktorscope.compose.KtorScopeScreen
 import io.github.mahmoud.ktorscope.ktor.KtorScope
 import io.ktor.client.HttpClient
@@ -148,6 +149,15 @@ private fun rememberSampleClient(): HttpClient {
                 captureBodies = true
                 maxBodySize = 250_000
                 redactHeaders = setOf("Authorization", "Cookie", "Set-Cookie", "X-Api-Key")
+                prettyPrint = true
+                prettyPrintConfig = KtorScopePrettyPrintConfig(
+                    includeHeaders = true,
+                    includeBodies = true,
+                    includeCurl = true,
+                    includeGraphQl = true,
+                    prettyJson = true,
+                )
+                logger = { message -> println(message) }
             }
         }
     }
