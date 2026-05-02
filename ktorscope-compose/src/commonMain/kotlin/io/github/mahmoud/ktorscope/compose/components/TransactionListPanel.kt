@@ -1,0 +1,223 @@
+/**
+ * Created by Mahmoud kamal El-Din on 02/05/2026
+ */
+package io.github.mahmoud.ktorscope.compose.components
+
+import androidx.compose.animation.Crossfade
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.ElevatedCard
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.dp
+import io.github.mahmoud.ktorscope.compose.KtorScopeThemeMode
+import io.github.mahmoud.ktorscope.core.NetworkTransaction
+
+@Composable
+internal fun TransactionListPanel(
+    transactions: List<NetworkTransaction>,
+    selectedId: String?,
+    query: String,
+    onQueryChange: (String) -> Unit,
+    filter: TransactionFilter,
+    onFilterChange: (TransactionFilter) -> Unit,
+    stats: NetworkStats,
+    themeMode: KtorScopeThemeMode,
+    onThemeModeChange: (KtorScopeThemeMode) -> Unit,
+    onClear: () -> Unit,
+    onSelect: (NetworkTransaction) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Column(
+        modifier.background(MaterialTheme.colorScheme.background).padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(14.dp),
+    ) {
+        TopBar(themeMode = themeMode, onThemeModeChange = onThemeModeChange)
+        StatsRow(stats)
+        OutlinedTextField(
+            value = query,
+            onValueChange = onQueryChange,
+            label = { Text("Search URL") },
+            singleLine = true,
+            shape = RoundedCornerShape(16.dp),
+            modifier = Modifier.fillMaxWidth(),
+        )
+        FilterRow(filter = filter, onFilterChange = onFilterChange)
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+            OutlinedButton(onClick = onClear, shape = RoundedCornerShape(14.dp)) {
+                Text("Clear logs")
+            }
+        }
+        Crossfade(targetState = transactions.isEmpty(), label = "empty") { empty ->
+            if (empty) {
+                EmptyState(Modifier.weight(1f).fillMaxWidth())
+            } else {
+                LazyColumn(
+                    modifier = Modifier.weight(1f),
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                ) {
+                    items(transactions, key = { it.id }) { transaction ->
+                        TransactionCard(
+                            transaction = transaction,
+                            selected = selectedId == transaction.id,
+                            onClick = { onSelect(transaction) },
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun TopBar(
+    themeMode: KtorScopeThemeMode,
+    onThemeModeChange: (KtorScopeThemeMode) -> Unit,
+) {
+    var expanded by remember { mutableStateOf(false) }
+    Row(
+        Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column {
+            Text("KtorScope", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+            Text(
+                "Ktor network inspector",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        Box {
+            OutlinedButton(onClick = { expanded = true }, shape = RoundedCornerShape(14.dp)) {
+                Text(themeMode.name)
+            }
+            DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+                KtorScopeThemeMode.entries.forEach { mode ->
+                    DropdownMenuItem(
+                        text = { Text(mode.name) },
+                        onClick = {
+                            expanded = false
+                            onThemeModeChange(mode)
+                        },
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun StatsRow(stats: NetworkStats) {
+    Row(
+        Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        StatPill("Total", stats.total.toString())
+        StatPill("Success", stats.success.toString(), SuccessColor)
+        StatPill("Error", stats.error.toString(), ErrorColor)
+        StatPill("Avg", "${stats.averageDuration}ms")
+    }
+}
+
+@Composable
+private fun StatPill(label: String, value: String, accent: Color = MaterialTheme.colorScheme.primary) {
+    ElevatedCard(
+        colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surface),
+        elevation = CardDefaults.elevatedCardElevation(defaultElevation = 2.dp),
+        shape = RoundedCornerShape(18.dp),
+    ) {
+        Column(Modifier.width(92.dp).padding(12.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            Text(label, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(value, style = MaterialTheme.typography.titleMedium, color = accent, fontWeight = FontWeight.Bold)
+        }
+    }
+}
+
+@Composable
+private fun FilterRow(filter: TransactionFilter, onFilterChange: (TransactionFilter) -> Unit) {
+    Row(
+        Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        TransactionFilter.entries.forEach { item ->
+            FilterChip(
+                selected = filter == item,
+                onClick = { onFilterChange(item) },
+                label = { Text(item.label) },
+                shape = RoundedCornerShape(999.dp),
+            )
+        }
+    }
+}
+
+@Composable
+private fun TransactionCard(
+    transaction: NetworkTransaction,
+    selected: Boolean,
+    onClick: () -> Unit,
+) {
+    val tone = transaction.statusTone()
+    val background by animateColorAsState(
+        targetValue = if (selected) MaterialTheme.colorScheme.primary.copy(alpha = 0.10f) else MaterialTheme.colorScheme.surface,
+        label = "cardColor",
+    )
+    ElevatedCard(
+        modifier = Modifier.fillMaxWidth().clickable(onClick = onClick),
+        colors = CardDefaults.elevatedCardColors(containerColor = background),
+        elevation = CardDefaults.elevatedCardElevation(defaultElevation = if (selected) 7.dp else 2.dp),
+        shape = RoundedCornerShape(22.dp),
+    ) {
+        Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                StatusDot(tone)
+                MethodChip(transaction.request.method)
+                StatusChip(transaction)
+                Spacer(Modifier.weight(1f))
+                Text("${transaction.durationMillis ?: 0}ms", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+            Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Text(transaction.request.url.hostPart(), style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text(transaction.request.url.pathPart(), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 2, overflow = TextOverflow.Ellipsis)
+            }
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                Text(transaction.createdAtMillis.timestampLabel(), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(transaction.bodySizeLabel(), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+            val error = transaction.error
+            if (error != null) {
+                Text("Error: ${error.message.orEmpty()}", style = MaterialTheme.typography.labelMedium, color = ErrorColor, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            }
+        }
+    }
+}

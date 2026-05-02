@@ -3,151 +3,136 @@
  */
 package io.github.mahmoud.ktorscope.compose
 
-import androidx.compose.foundation.ExperimentalFoundationApi
-import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.animation.AnimatedContent
 import androidx.compose.foundation.layout.BoxWithConstraints
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.lazy.LazyRow
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.AssistChip
-import androidx.compose.material3.Button
-import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.PrimaryTabRow
+import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
-import androidx.compose.material3.Tab
-import androidx.compose.material3.Text
 import androidx.compose.material3.VerticalDivider
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.text.font.FontFamily
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import io.github.mahmoud.ktorscope.compose.components.DetailsPanel
+import io.github.mahmoud.ktorscope.compose.components.TransactionFilter
+import io.github.mahmoud.ktorscope.compose.components.TransactionListPanel
+import io.github.mahmoud.ktorscope.compose.components.toStats
 import io.github.mahmoud.ktorscope.core.KtorScopeStore
-import io.github.mahmoud.ktorscope.core.NetworkTransaction
 
-@OptIn(ExperimentalFoundationApi::class)
+private val DefaultCopyHandler: (String) -> Unit = {}
+
 @Composable
 fun KtorScopeScreen(
     store: KtorScopeStore = KtorScopeStore.shared,
     modifier: Modifier = Modifier,
+    themeMode: KtorScopeThemeMode = KtorScopeThemeMode.System,
+    onThemeModeChange: (KtorScopeThemeMode) -> Unit = {},
+    onCopy: (String) -> Unit = DefaultCopyHandler,
+) {
+    var currentThemeMode by remember { mutableStateOf(themeMode) }
+    val platformCopy = rememberKtorScopeClipboard()
+    val copyHandler = if (onCopy === DefaultCopyHandler) platformCopy else onCopy
+
+    KtorScopeTheme(currentThemeMode) {
+        Scaffold { padding ->
+            KtorScopeContent(
+                store = store,
+                modifier = modifier.padding(padding),
+                themeMode = currentThemeMode,
+                onThemeModeChange = {
+                    currentThemeMode = it
+                    onThemeModeChange(it)
+                },
+                onCopy = copyHandler,
+            )
+        }
+    }
+}
+
+@Composable
+private fun KtorScopeContent(
+    store: KtorScopeStore,
+    modifier: Modifier,
+    themeMode: KtorScopeThemeMode,
+    onThemeModeChange: (KtorScopeThemeMode) -> Unit,
+    onCopy: (String) -> Unit,
 ) {
     val transactions by store.transactions.collectAsState()
     var selectedId by remember { mutableStateOf<String?>(null) }
     var query by remember { mutableStateOf("") }
-    var methodFilter by remember { mutableStateOf("All") }
-    var statusFilter by remember { mutableStateOf("All") }
-    var statusCodeFilter by remember { mutableStateOf("") }
-    val methods = remember(transactions) {
-        val standardMethods = listOf("GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS")
-        listOf("All") + (standardMethods + transactions.map { it.request.method.uppercase() })
-            .distinct()
-            .sortedWith(compareBy<String> { standardMethods.indexOf(it).takeIf { index -> index >= 0 } ?: Int.MAX_VALUE }.thenBy { it })
-    }
-    val filtered = remember(transactions, query, methodFilter, statusFilter, statusCodeFilter) {
+    var filter by remember { mutableStateOf(TransactionFilter.All) }
+    val filtered = remember(transactions, query, filter) {
         transactions.filter { transaction ->
             val matchesQuery = query.isBlank() ||
                 transaction.request.url.contains(query, ignoreCase = true)
-            val matchesMethod = methodFilter == "All" || transaction.request.method.equals(methodFilter, ignoreCase = true)
-            val status = transaction.response?.statusCode
-            val exactStatus = statusCodeFilter.toIntOrNull()
-            val matchesExactStatus = exactStatus == null || status == exactStatus
-            val matchesStatus = when (statusFilter) {
-                "All" -> true
-                "Success" -> status in 200..299
-                "Redirect" -> status in 300..399
-                "Client error" -> status in 400..499
-                "Server error" -> status in 500..599
-                "Failed" -> transaction.error != null
-                else -> true
-            }
-            matchesQuery && matchesMethod && matchesStatus && matchesExactStatus
+            matchesQuery && filter.matches(transaction)
         }
     }
-    val selected = filtered.firstOrNull { it.id == selectedId } ?: filtered.firstOrNull()
+    val selected = transactions.firstOrNull { it.id == selectedId }
+    val stats = remember(transactions) { transactions.toStats() }
 
-    Surface(modifier = modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
+    Surface(modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
         BoxWithConstraints(Modifier.fillMaxSize()) {
-            val wide = maxWidth >= 840.dp
+            val wide = maxWidth >= 900.dp
             if (wide) {
                 Row(Modifier.fillMaxSize()) {
-                    TransactionListPane(
+                    TransactionListPanel(
                         transactions = filtered,
                         selectedId = selected?.id,
                         query = query,
                         onQueryChange = { query = it },
-                        methods = methods,
-                        methodFilter = methodFilter,
-                        onMethodFilterChange = { methodFilter = it },
-                        statusFilter = statusFilter,
-                        onStatusFilterChange = { statusFilter = it },
-                        statusCodeFilter = statusCodeFilter,
-                        onStatusCodeFilterChange = { statusCodeFilter = it.filter(Char::isDigit).take(3) },
+                        filter = filter,
+                        onFilterChange = { filter = it },
+                        stats = stats,
+                        themeMode = themeMode,
+                        onThemeModeChange = onThemeModeChange,
                         onClear = {
                             store.clear()
                             selectedId = null
                         },
                         onSelect = { selectedId = it.id },
-                        modifier = Modifier.width(380.dp).fillMaxHeight(),
+                        modifier = Modifier.width(420.dp).fillMaxHeight(),
                     )
-                    VerticalDivider(Modifier.fillMaxHeight().width(1.dp))
-                    TransactionDetailsPane(
-                        transaction = selected,
+                    VerticalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.55f))
+                    DetailsPanel(
+                        transaction = selected ?: filtered.firstOrNull(),
+                        onBack = null,
+                        onCopy = onCopy,
                         modifier = Modifier.weight(1f).fillMaxHeight(),
                     )
                 }
             } else {
-                if (selectedId == null) {
-                    TransactionListPane(
-                        transactions = filtered,
-                        selectedId = null,
-                        query = query,
-                        onQueryChange = { query = it },
-                        methods = methods,
-                        methodFilter = methodFilter,
-                        onMethodFilterChange = { methodFilter = it },
-                        statusFilter = statusFilter,
-                        onStatusFilterChange = { statusFilter = it },
-                        statusCodeFilter = statusCodeFilter,
-                        onStatusCodeFilterChange = { statusCodeFilter = it.filter(Char::isDigit).take(3) },
-                        onClear = { store.clear() },
-                        onSelect = { selectedId = it.id },
-                        modifier = Modifier.fillMaxSize(),
-                    )
-                } else {
-                    Column(Modifier.fillMaxSize()) {
-                        Button(
-                            onClick = { selectedId = null },
-                            modifier = Modifier.padding(12.dp),
-                        ) {
-                            Text("Back")
-                        }
-                        TransactionDetailsPane(
-                            transaction = selected,
-                            modifier = Modifier.weight(1f),
+                AnimatedContent(targetState = selectedId != null, label = "screen") { showingDetails ->
+                    if (showingDetails) {
+                        DetailsPanel(
+                            transaction = transactions.firstOrNull { it.id == selectedId },
+                            onBack = { selectedId = null },
+                            onCopy = onCopy,
+                            modifier = Modifier.fillMaxSize(),
+                        )
+                    } else {
+                        TransactionListPanel(
+                            transactions = filtered,
+                            selectedId = null,
+                            query = query,
+                            onQueryChange = { query = it },
+                            filter = filter,
+                            onFilterChange = { filter = it },
+                            stats = stats,
+                            themeMode = themeMode,
+                            onThemeModeChange = onThemeModeChange,
+                            onClear = { store.clear() },
+                            onSelect = { selectedId = it.id },
+                            modifier = Modifier.fillMaxSize(),
                         )
                     }
                 }
@@ -155,286 +140,3 @@ fun KtorScopeScreen(
         }
     }
 }
-
-@Composable
-private fun TransactionListPane(
-    transactions: List<NetworkTransaction>,
-    selectedId: String?,
-    query: String,
-    onQueryChange: (String) -> Unit,
-    methods: List<String>,
-    methodFilter: String,
-    onMethodFilterChange: (String) -> Unit,
-    statusFilter: String,
-    onStatusFilterChange: (String) -> Unit,
-    statusCodeFilter: String,
-    onStatusCodeFilterChange: (String) -> Unit,
-    onClear: () -> Unit,
-    onSelect: (NetworkTransaction) -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    Column(
-        modifier
-            .background(GitHubCanvas)
-            .padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
-    ) {
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-            Column {
-                Text(
-                    "KtorScope",
-                    style = MaterialTheme.typography.titleLarge,
-                    fontWeight = FontWeight.Bold,
-                    color = GitHubText,
-                )
-                Text("${transactions.size} requests", style = MaterialTheme.typography.bodySmall, color = GitHubMuted)
-            }
-            Button(onClick = onClear) {
-                Text("Clear")
-            }
-        }
-        OutlinedTextField(
-            value = query,
-            onValueChange = onQueryChange,
-            label = { Text("Search URL") },
-            singleLine = true,
-            modifier = Modifier.fillMaxWidth(),
-        )
-        OutlinedTextField(
-            value = statusCodeFilter,
-            onValueChange = onStatusCodeFilterChange,
-            label = { Text("Status code") },
-            singleLine = true,
-            modifier = Modifier.fillMaxWidth(),
-        )
-        ChipRow(values = methods, selected = methodFilter, onSelected = onMethodFilterChange)
-        ChipRow(
-            values = listOf("All", "Success", "Redirect", "Client error", "Server error", "Failed"),
-            selected = statusFilter,
-            onSelected = onStatusFilterChange,
-        )
-        LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            items(transactions, key = { it.id }) { transaction ->
-                TransactionRow(
-                    transaction = transaction,
-                    selected = selectedId == transaction.id,
-                    onClick = { onSelect(transaction) },
-                    modifier = Modifier,
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun ChipRow(
-    values: List<String>,
-    selected: String,
-    onSelected: (String) -> Unit,
-) {
-    LazyRow(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        items(values) { value ->
-            FilterChip(
-                selected = selected == value,
-                onClick = { onSelected(value) },
-                label = { Text(value, maxLines = 1) },
-            )
-        }
-    }
-}
-
-@Composable
-private fun TransactionRow(
-    transaction: NetworkTransaction,
-    selected: Boolean,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    val container = if (selected) {
-        GitHubBlueSubtle
-    } else {
-        GitHubSurface
-    }
-    Surface(
-        modifier = modifier.fillMaxWidth(),
-        shape = MaterialTheme.shapes.small,
-        color = container,
-        border = BorderStroke(1.dp, if (selected) GitHubBlue else GitHubBorder),
-    ) {
-        Column(
-            Modifier
-                .clickable(onClick = onClick)
-                .padding(12.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                MethodLabel(transaction.request.method)
-                StatusLabel(transaction)
-                transaction.durationMillis?.let {
-                    AssistChip(onClick = onClick, label = { Text("${it}ms") })
-                }
-            }
-            Text(
-                transaction.request.url,
-                style = MaterialTheme.typography.bodyMedium,
-                color = GitHubText,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis,
-            )
-        }
-    }
-}
-
-@Composable
-private fun TransactionDetailsPane(
-    transaction: NetworkTransaction?,
-    modifier: Modifier = Modifier,
-) {
-    if (transaction == null) {
-        Column(modifier.padding(24.dp)) {
-            Text("No transactions yet", style = MaterialTheme.typography.titleMedium)
-            Text("Trigger a request in the sample app to see it here.")
-        }
-        return
-    }
-
-    var selectedTab by remember(transaction.id) { mutableIntStateOf(0) }
-    Column(
-        modifier
-            .background(GitHubCanvas)
-            .padding(16.dp),
-    ) {
-        Text(
-            transaction.request.url,
-            style = MaterialTheme.typography.titleMedium,
-            fontWeight = FontWeight.Bold,
-            color = GitHubText,
-            maxLines = 3,
-            overflow = TextOverflow.Ellipsis,
-        )
-        Spacer(Modifier.height(8.dp))
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            MethodLabel(transaction.request.method)
-            StatusLabel(transaction)
-            transaction.durationMillis?.let { AssistChip(onClick = {}, label = { Text("${it}ms") }) }
-        }
-        Spacer(Modifier.height(12.dp))
-        PrimaryTabRow(selectedTabIndex = selectedTab) {
-            Tab(selected = selectedTab == 0, onClick = { selectedTab = 0 }, text = { Text("Request") })
-            Tab(selected = selectedTab == 1, onClick = { selectedTab = 1 }, text = { Text("Response") })
-        }
-        Column(
-            Modifier
-                .weight(1f)
-                .verticalScroll(rememberScrollState())
-                .padding(top = 16.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp),
-        ) {
-            if (selectedTab == 0) {
-                HeadersSection(transaction.request.headers)
-                BodySection(transaction.request.body, transaction.request.bodyTruncated)
-            } else {
-                val response = transaction.response
-                if (response != null) {
-                    Text("${response.statusCode} ${response.statusDescription}", style = MaterialTheme.typography.titleSmall)
-                    HeadersSection(response.headers)
-                    BodySection(response.body, response.bodyTruncated)
-                }
-                transaction.error?.let {
-                    Section("Error") {
-                        Text("${it.type}: ${it.message.orEmpty()}", color = MaterialTheme.colorScheme.error)
-                    }
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun HeadersSection(headers: Map<String, List<String>>) {
-    Section("Headers") {
-        if (headers.isEmpty()) {
-            Text("No headers captured", style = MaterialTheme.typography.bodySmall, color = GitHubMuted)
-        } else {
-            headers.forEach { (name, values) ->
-                Text(
-                    "$name: ${values.joinToString()}",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = GitHubText,
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun BodySection(body: String?, truncated: Boolean) {
-    Section("Body") {
-        Text(
-            text = when {
-                body == null -> "No body captured"
-                truncated -> "$body\n\n[truncated]"
-                else -> body
-            },
-            style = MaterialTheme.typography.bodySmall,
-            fontFamily = FontFamily.Monospace,
-            color = GitHubText,
-        )
-    }
-}
-
-@Composable
-private fun Section(
-    title: String,
-    content: @Composable () -> Unit,
-) {
-    Surface(
-        color = GitHubSurface,
-        border = BorderStroke(1.dp, GitHubBorder),
-        shape = MaterialTheme.shapes.small,
-    ) {
-        Column(Modifier.fillMaxWidth().padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text(title, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold, color = GitHubText)
-            content()
-        }
-    }
-}
-
-@Composable
-private fun MethodLabel(method: String) {
-    AssistChip(
-        onClick = {},
-        label = {
-            Text(method.uppercase(), color = GitHubText, fontWeight = FontWeight.SemiBold)
-        },
-    )
-}
-
-@Composable
-private fun StatusLabel(transaction: NetworkTransaction) {
-    val status = transaction.response?.statusCode
-    val color = when {
-        transaction.error != null -> GitHubDanger
-        status in 200..299 -> GitHubSuccess
-        status in 300..399 -> GitHubAttention
-        status in 400..599 -> GitHubDanger
-        else -> GitHubMuted
-    }
-    AssistChip(
-        onClick = {},
-        label = {
-            Text(status?.toString() ?: "Failed", color = color, fontWeight = FontWeight.SemiBold)
-        },
-    )
-}
-
-private val GitHubCanvas = Color(0xFFF6F8FA)
-private val GitHubSurface = Color(0xFFFFFFFF)
-private val GitHubBorder = Color(0xFFD0D7DE)
-private val GitHubText = Color(0xFF24292F)
-private val GitHubMuted = Color(0xFF57606A)
-private val GitHubBlue = Color(0xFF0969DA)
-private val GitHubBlueSubtle = Color(0xFFDDF4FF)
-private val GitHubSuccess = Color(0xFF1A7F37)
-private val GitHubAttention = Color(0xFF9A6700)
-private val GitHubDanger = Color(0xFFCF222E)
