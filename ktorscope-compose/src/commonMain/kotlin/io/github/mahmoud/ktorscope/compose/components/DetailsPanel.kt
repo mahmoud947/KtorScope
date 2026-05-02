@@ -35,6 +35,7 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import io.github.mahmoud.ktorscope.core.NetworkTransaction
+import io.github.mahmoud.ktorscope.core.toCurlCommand
 
 @Composable
 internal fun DetailsPanel(
@@ -118,6 +119,9 @@ private fun SummaryCard(transaction: NetworkTransaction, onCopy: (String) -> Uni
                 }
                 OutlinedButton(onClick = { onCopy(transaction.request.headers.headersText()) }, shape = RoundedCornerShape(14.dp)) {
                     Text("Copy headers")
+                }
+                OutlinedButton(onClick = { onCopy(transaction.toCurlCommand()) }, shape = RoundedCornerShape(14.dp)) {
+                    Text("Copy cURL")
                 }
             }
         }
