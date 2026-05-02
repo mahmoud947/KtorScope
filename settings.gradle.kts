@@ -28,7 +28,6 @@ dependencyResolutionManagement {
     }
 }
 
-include(":composeApp")
 include(":sample-compose-app")
 include(":ktorscope-core")
 include(":ktorscope-ktor")
