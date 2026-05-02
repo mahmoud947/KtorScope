@@ -28,7 +28,10 @@ import io.ktor.client.call.body
 import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
 import io.ktor.client.request.get
 import io.ktor.client.request.header
+import io.ktor.client.request.delete
+import io.ktor.client.request.patch
 import io.ktor.client.request.post
+import io.ktor.client.request.put
 import io.ktor.client.request.setBody
 import io.ktor.http.ContentType
 import io.ktor.http.contentType
@@ -82,6 +85,31 @@ fun App() {
                                 status = runSampleCall { client.get("https://httpbin.org/delay/2").body<String>() }
                             }
                         },
+                        onPut = {
+                            scope.launch {
+                                status = runSampleCall {
+                                    client.put("https://httpbin.org/put") {
+                                        contentType(ContentType.Application.Json)
+                                        setBody("""{"method":"PUT","message":"Updated from KtorScope"}""")
+                                    }.body<String>()
+                                }
+                            }
+                        },
+                        onPatch = {
+                            scope.launch {
+                                status = runSampleCall {
+                                    client.patch("https://httpbin.org/patch") {
+                                        contentType(ContentType.Application.Json)
+                                        setBody("""{"method":"PATCH","message":"Partially updated from KtorScope"}""")
+                                    }.body<String>()
+                                }
+                            }
+                        },
+                        onDelete = {
+                            scope.launch {
+                                status = runSampleCall { client.delete("https://httpbin.org/delete").body<String>() }
+                            }
+                        },
                     )
                     Button(onClick = { showInspector = true }) {
                         Text("Open KtorScope")
@@ -113,6 +141,9 @@ private fun RequestButtons(
     onFailure: () -> Unit,
     onPost: () -> Unit,
     onDelayed: () -> Unit,
+    onPut: () -> Unit,
+    onPatch: () -> Unit,
+    onDelete: () -> Unit,
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -122,6 +153,11 @@ private fun RequestButtons(
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             Button(onClick = onPost, modifier = Modifier.weight(1f)) { Text("POST body") }
             Button(onClick = onDelayed, modifier = Modifier.weight(1f)) { Text("Delayed") }
+        }
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            Button(onClick = onPut, modifier = Modifier.weight(1f)) { Text("PUT") }
+            Button(onClick = onPatch, modifier = Modifier.weight(1f)) { Text("PATCH") }
+            Button(onClick = onDelete, modifier = Modifier.weight(1f)) { Text("DELETE") }
         }
     }
 }

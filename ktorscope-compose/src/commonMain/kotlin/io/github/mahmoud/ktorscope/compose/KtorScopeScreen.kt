@@ -4,6 +4,7 @@
 package io.github.mahmoud.ktorscope.compose
 
 import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -17,6 +18,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
@@ -39,6 +41,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -57,25 +60,31 @@ fun KtorScopeScreen(
     var query by remember { mutableStateOf("") }
     var methodFilter by remember { mutableStateOf("All") }
     var statusFilter by remember { mutableStateOf("All") }
+    var statusCodeFilter by remember { mutableStateOf("") }
     val methods = remember(transactions) {
-        listOf("All") + transactions.map { it.request.method }.distinct().sorted()
+        val standardMethods = listOf("GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS")
+        listOf("All") + (standardMethods + transactions.map { it.request.method.uppercase() })
+            .distinct()
+            .sortedWith(compareBy<String> { standardMethods.indexOf(it).takeIf { index -> index >= 0 } ?: Int.MAX_VALUE }.thenBy { it })
     }
-    val filtered = remember(transactions, query, methodFilter, statusFilter) {
+    val filtered = remember(transactions, query, methodFilter, statusFilter, statusCodeFilter) {
         transactions.filter { transaction ->
             val matchesQuery = query.isBlank() ||
                 transaction.request.url.contains(query, ignoreCase = true)
-            val matchesMethod = methodFilter == "All" || transaction.request.method == methodFilter
+            val matchesMethod = methodFilter == "All" || transaction.request.method.equals(methodFilter, ignoreCase = true)
             val status = transaction.response?.statusCode
+            val exactStatus = statusCodeFilter.toIntOrNull()
+            val matchesExactStatus = exactStatus == null || status == exactStatus
             val matchesStatus = when (statusFilter) {
                 "All" -> true
-                "2xx" -> status in 200..299
-                "3xx" -> status in 300..399
-                "4xx" -> status in 400..499
-                "5xx" -> status in 500..599
+                "Success" -> status in 200..299
+                "Redirect" -> status in 300..399
+                "Client error" -> status in 400..499
+                "Server error" -> status in 500..599
                 "Failed" -> transaction.error != null
                 else -> true
             }
-            matchesQuery && matchesMethod && matchesStatus
+            matchesQuery && matchesMethod && matchesStatus && matchesExactStatus
         }
     }
     val selected = filtered.firstOrNull { it.id == selectedId } ?: filtered.firstOrNull()
@@ -95,6 +104,8 @@ fun KtorScopeScreen(
                         onMethodFilterChange = { methodFilter = it },
                         statusFilter = statusFilter,
                         onStatusFilterChange = { statusFilter = it },
+                        statusCodeFilter = statusCodeFilter,
+                        onStatusCodeFilterChange = { statusCodeFilter = it.filter(Char::isDigit).take(3) },
                         onClear = {
                             store.clear()
                             selectedId = null
@@ -120,6 +131,8 @@ fun KtorScopeScreen(
                         onMethodFilterChange = { methodFilter = it },
                         statusFilter = statusFilter,
                         onStatusFilterChange = { statusFilter = it },
+                        statusCodeFilter = statusCodeFilter,
+                        onStatusCodeFilterChange = { statusCodeFilter = it.filter(Char::isDigit).take(3) },
                         onClear = { store.clear() },
                         onSelect = { selectedId = it.id },
                         modifier = Modifier.fillMaxSize(),
@@ -154,15 +167,27 @@ private fun TransactionListPane(
     onMethodFilterChange: (String) -> Unit,
     statusFilter: String,
     onStatusFilterChange: (String) -> Unit,
+    statusCodeFilter: String,
+    onStatusCodeFilterChange: (String) -> Unit,
     onClear: () -> Unit,
     onSelect: (NetworkTransaction) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    Column(modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+    Column(
+        modifier
+            .background(GitHubCanvas)
+            .padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
             Column {
-                Text("KtorScope", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-                Text("${transactions.size} transactions", style = MaterialTheme.typography.bodySmall)
+                Text(
+                    "KtorScope",
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold,
+                    color = GitHubText,
+                )
+                Text("${transactions.size} requests", style = MaterialTheme.typography.bodySmall, color = GitHubMuted)
             }
             Button(onClick = onClear) {
                 Text("Clear")
@@ -175,9 +200,16 @@ private fun TransactionListPane(
             singleLine = true,
             modifier = Modifier.fillMaxWidth(),
         )
+        OutlinedTextField(
+            value = statusCodeFilter,
+            onValueChange = onStatusCodeFilterChange,
+            label = { Text("Status code") },
+            singleLine = true,
+            modifier = Modifier.fillMaxWidth(),
+        )
         ChipRow(values = methods, selected = methodFilter, onSelected = onMethodFilterChange)
         ChipRow(
-            values = listOf("All", "2xx", "3xx", "4xx", "5xx", "Failed"),
+            values = listOf("All", "Success", "Redirect", "Client error", "Server error", "Failed"),
             selected = statusFilter,
             onSelected = onStatusFilterChange,
         )
@@ -200,8 +232,8 @@ private fun ChipRow(
     selected: String,
     onSelected: (String) -> Unit,
 ) {
-    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        values.take(6).forEach { value ->
+    LazyRow(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        items(values) { value ->
             FilterChip(
                 selected = selected == value,
                 onClick = { onSelected(value) },
@@ -219,36 +251,37 @@ private fun TransactionRow(
     modifier: Modifier = Modifier,
 ) {
     val container = if (selected) {
-        MaterialTheme.colorScheme.primaryContainer
+        GitHubBlueSubtle
     } else {
-        MaterialTheme.colorScheme.surfaceVariant
+        GitHubSurface
     }
-    Column(
-        modifier
-            .fillMaxWidth()
-            .background(container, MaterialTheme.shapes.small)
-            .clickable(onClick = onClick)
-            .padding(12.dp),
-        verticalArrangement = Arrangement.spacedBy(6.dp),
+    Surface(
+        modifier = modifier.fillMaxWidth(),
+        shape = MaterialTheme.shapes.small,
+        color = container,
+        border = BorderStroke(1.dp, if (selected) GitHubBlue else GitHubBorder),
     ) {
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            AssistChip(onClick = onClick, label = { Text(transaction.request.method) })
-            AssistChip(
-                onClick = onClick,
-                label = {
-                    Text(transaction.response?.statusCode?.toString() ?: "ERR")
-                },
-            )
-            transaction.durationMillis?.let {
-                AssistChip(onClick = onClick, label = { Text("${it}ms") })
+        Column(
+            Modifier
+                .clickable(onClick = onClick)
+                .padding(12.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                MethodLabel(transaction.request.method)
+                StatusLabel(transaction)
+                transaction.durationMillis?.let {
+                    AssistChip(onClick = onClick, label = { Text("${it}ms") })
+                }
             }
+            Text(
+                transaction.request.url,
+                style = MaterialTheme.typography.bodyMedium,
+                color = GitHubText,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+            )
         }
-        Text(
-            transaction.request.url,
-            style = MaterialTheme.typography.bodyMedium,
-            maxLines = 2,
-            overflow = TextOverflow.Ellipsis,
-        )
     }
 }
 
@@ -266,12 +299,23 @@ private fun TransactionDetailsPane(
     }
 
     var selectedTab by remember(transaction.id) { mutableIntStateOf(0) }
-    Column(modifier.padding(16.dp)) {
-        Text(transaction.request.url, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+    Column(
+        modifier
+            .background(GitHubCanvas)
+            .padding(16.dp),
+    ) {
+        Text(
+            transaction.request.url,
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.Bold,
+            color = GitHubText,
+            maxLines = 3,
+            overflow = TextOverflow.Ellipsis,
+        )
         Spacer(Modifier.height(8.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            AssistChip(onClick = {}, label = { Text(transaction.request.method) })
-            AssistChip(onClick = {}, label = { Text(transaction.response?.statusCode?.toString() ?: "Failed") })
+            MethodLabel(transaction.request.method)
+            StatusLabel(transaction)
             transaction.durationMillis?.let { AssistChip(onClick = {}, label = { Text("${it}ms") }) }
         }
         Spacer(Modifier.height(12.dp))
@@ -310,10 +354,14 @@ private fun TransactionDetailsPane(
 private fun HeadersSection(headers: Map<String, List<String>>) {
     Section("Headers") {
         if (headers.isEmpty()) {
-            Text("No headers captured", style = MaterialTheme.typography.bodySmall)
+            Text("No headers captured", style = MaterialTheme.typography.bodySmall, color = GitHubMuted)
         } else {
             headers.forEach { (name, values) ->
-                Text("$name: ${values.joinToString()}", style = MaterialTheme.typography.bodySmall)
+                Text(
+                    "$name: ${values.joinToString()}",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = GitHubText,
+                )
             }
         }
     }
@@ -330,6 +378,7 @@ private fun BodySection(body: String?, truncated: Boolean) {
             },
             style = MaterialTheme.typography.bodySmall,
             fontFamily = FontFamily.Monospace,
+            color = GitHubText,
         )
     }
 }
@@ -339,8 +388,53 @@ private fun Section(
     title: String,
     content: @Composable () -> Unit,
 ) {
-    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Text(title, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
-        content()
+    Surface(
+        color = GitHubSurface,
+        border = BorderStroke(1.dp, GitHubBorder),
+        shape = MaterialTheme.shapes.small,
+    ) {
+        Column(Modifier.fillMaxWidth().padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text(title, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold, color = GitHubText)
+            content()
+        }
     }
 }
+
+@Composable
+private fun MethodLabel(method: String) {
+    AssistChip(
+        onClick = {},
+        label = {
+            Text(method.uppercase(), color = GitHubText, fontWeight = FontWeight.SemiBold)
+        },
+    )
+}
+
+@Composable
+private fun StatusLabel(transaction: NetworkTransaction) {
+    val status = transaction.response?.statusCode
+    val color = when {
+        transaction.error != null -> GitHubDanger
+        status in 200..299 -> GitHubSuccess
+        status in 300..399 -> GitHubAttention
+        status in 400..599 -> GitHubDanger
+        else -> GitHubMuted
+    }
+    AssistChip(
+        onClick = {},
+        label = {
+            Text(status?.toString() ?: "Failed", color = color, fontWeight = FontWeight.SemiBold)
+        },
+    )
+}
+
+private val GitHubCanvas = Color(0xFFF6F8FA)
+private val GitHubSurface = Color(0xFFFFFFFF)
+private val GitHubBorder = Color(0xFFD0D7DE)
+private val GitHubText = Color(0xFF24292F)
+private val GitHubMuted = Color(0xFF57606A)
+private val GitHubBlue = Color(0xFF0969DA)
+private val GitHubBlueSubtle = Color(0xFFDDF4FF)
+private val GitHubSuccess = Color(0xFF1A7F37)
+private val GitHubAttention = Color(0xFF9A6700)
+private val GitHubDanger = Color(0xFFCF222E)
