@@ -4,7 +4,9 @@
 package io.github.mahmoud.ktorscope.compose.components
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
@@ -17,7 +19,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import io.github.mahmoud.ktorscope.compose.KtorScopeTheme
+import io.github.mahmoud.ktorscope.compose.KtorScopeThemeMode
 import io.github.mahmoud.ktorscope.core.NetworkTransaction
 
 @Composable
@@ -57,4 +62,18 @@ internal fun StatusChip(transaction: NetworkTransaction) {
 @Composable
 internal fun StatusDot(color: Color) {
     Box(Modifier.size(10.dp).clip(CircleShape).background(color))
+}
+
+@Preview
+@Composable
+private fun KtorScopeChipsPreview() {
+    KtorScopeTheme(KtorScopeThemeMode.Light) {
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            StatusDot(SuccessColor)
+            MethodChip("GET")
+            MethodChip("POST")
+            MethodChip("DELETE")
+            StatusChip(KtorScopePreviewData.transactions.first())
+        }
+    }
 }

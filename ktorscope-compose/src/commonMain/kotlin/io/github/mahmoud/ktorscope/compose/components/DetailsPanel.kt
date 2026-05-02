@@ -4,6 +4,7 @@
 package io.github.mahmoud.ktorscope.compose.components
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
@@ -33,8 +34,13 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import io.github.mahmoud.ktorscope.compose.KtorScopeTheme
+import io.github.mahmoud.ktorscope.compose.KtorScopeThemeMode
+import io.github.mahmoud.ktorscope.core.KtorScopeExportConfig
 import io.github.mahmoud.ktorscope.core.NetworkTransaction
+import io.github.mahmoud.ktorscope.core.exportKtorScopeLogs
 import io.github.mahmoud.ktorscope.core.graphQlOperation
 import io.github.mahmoud.ktorscope.core.toCurlCommand
 
@@ -43,6 +49,7 @@ internal fun DetailsPanel(
     transaction: NetworkTransaction?,
     onBack: (() -> Unit)?,
     onCopy: (String) -> Unit,
+    onShare: (String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     if (transaction == null) {
@@ -57,7 +64,7 @@ internal fun DetailsPanel(
         if (onBack != null) {
             TextButton(onClick = onBack) { Text("Back") }
         }
-        SummaryCard(transaction, onCopy)
+        SummaryCard(transaction = transaction, onCopy = onCopy, onShare = onShare)
         PrimaryTabRow(selectedTabIndex = selectedTab, containerColor = MaterialTheme.colorScheme.background) {
             Tab(selected = selectedTab == 0, onClick = { selectedTab = 0 }, text = { Text("Request") })
             Tab(selected = selectedTab == 1, onClick = { selectedTab = 1 }, text = { Text("Response") })
@@ -120,7 +127,11 @@ private fun GraphQlSection(transaction: NetworkTransaction, onCopy: (String) -> 
 }
 
 @Composable
-private fun SummaryCard(transaction: NetworkTransaction, onCopy: (String) -> Unit) {
+private fun SummaryCard(
+    transaction: NetworkTransaction,
+    onCopy: (String) -> Unit,
+    onShare: (String) -> Unit,
+) {
     ElevatedCard(
         colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surface),
         elevation = CardDefaults.elevatedCardElevation(defaultElevation = 4.dp),
@@ -133,7 +144,10 @@ private fun SummaryCard(transaction: NetworkTransaction, onCopy: (String) -> Uni
                 transaction.durationMillis?.let { AssistChip(onClick = {}, label = { Text("${it}ms") }) }
             }
             Text(transaction.request.url, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
                 OutlinedButton(onClick = { onCopy(transaction.request.url) }, shape = RoundedCornerShape(14.dp)) {
                     Text("Copy URL")
                 }
@@ -142,6 +156,14 @@ private fun SummaryCard(transaction: NetworkTransaction, onCopy: (String) -> Uni
                 }
                 OutlinedButton(onClick = { onCopy(transaction.toCurlCommand()) }, shape = RoundedCornerShape(14.dp)) {
                     Text("Copy cURL")
+                }
+                OutlinedButton(
+                    onClick = {
+                        onShare(listOf(transaction).exportKtorScopeLogs(KtorScopeExportConfig()))
+                    },
+                    shape = RoundedCornerShape(14.dp),
+                ) {
+                    Text("Share")
                 }
             }
         }
@@ -207,5 +229,31 @@ private fun SectionCard(
 private fun EmptySection(text: String) {
     SectionCard(text) {
         Text("Nothing to show here.", color = MaterialTheme.colorScheme.onSurfaceVariant)
+    }
+}
+
+@Preview
+@Composable
+private fun DetailsPanelSuccessPreview() {
+    KtorScopeTheme(KtorScopeThemeMode.Light) {
+        DetailsPanel(
+            transaction = KtorScopePreviewData.transactions.first(),
+            onBack = {},
+            onCopy = {},
+            onShare = {},
+        )
+    }
+}
+
+@Preview
+@Composable
+private fun DetailsPanelGraphQlPreview() {
+    KtorScopeTheme(KtorScopeThemeMode.Dark) {
+        DetailsPanel(
+            transaction = KtorScopePreviewData.transactions[1],
+            onBack = {},
+            onCopy = {},
+            onShare = {},
+        )
     }
 }

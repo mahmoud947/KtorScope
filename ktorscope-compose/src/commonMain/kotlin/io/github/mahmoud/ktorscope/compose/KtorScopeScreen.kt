@@ -21,14 +21,19 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import io.github.mahmoud.ktorscope.compose.components.DetailsPanel
+import io.github.mahmoud.ktorscope.compose.components.KtorScopePreviewData
 import io.github.mahmoud.ktorscope.compose.components.TransactionFilter
 import io.github.mahmoud.ktorscope.compose.components.TransactionListPanel
 import io.github.mahmoud.ktorscope.compose.components.toStats
+import io.github.mahmoud.ktorscope.core.KtorScopeExportConfig
 import io.github.mahmoud.ktorscope.core.KtorScopeStore
+import io.github.mahmoud.ktorscope.core.exportKtorScopeLogs
 
 private val DefaultCopyHandler: (String) -> Unit = {}
+private val DefaultShareHandler: (String) -> Unit = {}
 
 @Composable
 fun KtorScopeScreen(
@@ -38,10 +43,13 @@ fun KtorScopeScreen(
     onBackClicked: (() -> Unit)? = null,
     onThemeModeChange: (KtorScopeThemeMode) -> Unit = {},
     onCopy: (String) -> Unit = DefaultCopyHandler,
+    onShare: (String) -> Unit = DefaultShareHandler,
 ) {
     var currentThemeMode by remember { mutableStateOf(themeMode) }
     val platformCopy = rememberKtorScopeClipboard()
+    val platformShare = rememberKtorScopeShare()
     val copyHandler = if (onCopy === DefaultCopyHandler) platformCopy else onCopy
+    val shareHandler = if (onShare === DefaultShareHandler) platformShare else onShare
 
     KtorScopeTheme(currentThemeMode) {
         Scaffold { padding ->
@@ -55,9 +63,32 @@ fun KtorScopeScreen(
                 },
                 onBackClicked = onBackClicked,
                 onCopy = copyHandler,
+                onShare = shareHandler,
             )
         }
     }
+}
+
+@Preview
+@Composable
+private fun KtorScopeScreenLightPreview() {
+    KtorScopeScreen(
+        store = KtorScopeStore(KtorScopePreviewData.transactions),
+        themeMode = KtorScopeThemeMode.Light,
+        onCopy = {},
+        onShare = {},
+    )
+}
+
+@Preview
+@Composable
+private fun KtorScopeScreenDarkPreview() {
+    KtorScopeScreen(
+        store = KtorScopeStore(KtorScopePreviewData.transactions),
+        themeMode = KtorScopeThemeMode.Dark,
+        onCopy = {},
+        onShare = {},
+    )
 }
 
 @Composable
@@ -68,6 +99,7 @@ private fun KtorScopeContent(
     onThemeModeChange: (KtorScopeThemeMode) -> Unit,
     onBackClicked: (() -> Unit)?,
     onCopy: (String) -> Unit,
+    onShare: (String) -> Unit,
 ) {
     val transactions by store.transactions.collectAsState()
     var selectedId by remember { mutableStateOf<String?>(null) }
@@ -99,6 +131,9 @@ private fun KtorScopeContent(
                         themeMode = themeMode,
                         onThemeModeChange = onThemeModeChange,
                         onBackClicked = onBackClicked,
+                        onShareLogs = {
+                            onShare(filtered.exportKtorScopeLogs(KtorScopeExportConfig()))
+                        },
                         onClear = {
                             store.clear()
                             selectedId = null
@@ -111,6 +146,7 @@ private fun KtorScopeContent(
                         transaction = selected ?: filtered.firstOrNull(),
                         onBack = null,
                         onCopy = onCopy,
+                        onShare = onShare,
                         modifier = Modifier.weight(1f).fillMaxHeight(),
                     )
                 }
@@ -121,6 +157,7 @@ private fun KtorScopeContent(
                             transaction = transactions.firstOrNull { it.id == selectedId },
                             onBack = { selectedId = null },
                             onCopy = onCopy,
+                            onShare = onShare,
                             modifier = Modifier.fillMaxSize(),
                         )
                     } else {
@@ -135,6 +172,9 @@ private fun KtorScopeContent(
                             themeMode = themeMode,
                             onThemeModeChange = onThemeModeChange,
                             onBackClicked = onBackClicked,
+                            onShareLogs = {
+                                onShare(filtered.exportKtorScopeLogs(KtorScopeExportConfig()))
+                            },
                             onClear = { store.clear() },
                             onSelect = { selectedId = it.id },
                             modifier = Modifier.fillMaxSize(),

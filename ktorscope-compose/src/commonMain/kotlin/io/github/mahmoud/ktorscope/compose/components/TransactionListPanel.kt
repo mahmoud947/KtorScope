@@ -39,7 +39,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import io.github.mahmoud.ktorscope.compose.KtorScopeTheme
 import io.github.mahmoud.ktorscope.compose.KtorScopeThemeMode
 import io.github.mahmoud.ktorscope.core.NetworkTransaction
 
@@ -55,6 +57,7 @@ internal fun TransactionListPanel(
     themeMode: KtorScopeThemeMode,
     onThemeModeChange: (KtorScopeThemeMode) -> Unit,
     onBackClicked: (() -> Unit)?,
+    onShareLogs: () -> Unit,
     onClear: () -> Unit,
     onSelect: (NetworkTransaction) -> Unit,
     modifier: Modifier = Modifier,
@@ -79,7 +82,10 @@ internal fun TransactionListPanel(
             modifier = Modifier.fillMaxWidth(),
         )
         FilterRow(filter = filter, onFilterChange = onFilterChange)
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp, Alignment.End)) {
+            OutlinedButton(onClick = onShareLogs, shape = RoundedCornerShape(14.dp)) {
+                Text("Share logs")
+            }
             OutlinedButton(onClick = onClear, shape = RoundedCornerShape(14.dp)) {
                 Text("Clear logs")
             }
@@ -225,5 +231,39 @@ private fun TransactionCard(
                 Text("Error: ${error.message.orEmpty()}", style = MaterialTheme.typography.labelMedium, color = ErrorColor, maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
         }
+    }
+}
+
+@Preview
+@Composable
+private fun TransactionListPanelPreview() {
+    KtorScopeTheme(KtorScopeThemeMode.Light) {
+        TransactionListPanel(
+            transactions = KtorScopePreviewData.transactions,
+            selectedId = KtorScopePreviewData.transactions.first().id,
+            query = "",
+            onQueryChange = {},
+            filter = TransactionFilter.All,
+            onFilterChange = {},
+            stats = KtorScopePreviewData.transactions.toStats(),
+            themeMode = KtorScopeThemeMode.Light,
+            onThemeModeChange = {},
+            onBackClicked = {},
+            onShareLogs = {},
+            onClear = {},
+            onSelect = {},
+        )
+    }
+}
+
+@Preview
+@Composable
+private fun TransactionCardPreview() {
+    KtorScopeTheme(KtorScopeThemeMode.Dark) {
+        TransactionCard(
+            transaction = KtorScopePreviewData.transactions.first(),
+            selected = true,
+            onClick = {},
+        )
     }
 }

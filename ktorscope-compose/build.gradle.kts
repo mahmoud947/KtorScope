@@ -67,6 +67,7 @@ kotlin {
                 api(libs.compose.foundation)
                 api(libs.compose.material3)
                 api(libs.compose.ui)
+                implementation(libs.compose.uiToolingPreview)
             }
         }
 
@@ -78,9 +79,7 @@ kotlin {
 
         androidMain {
             dependencies {
-                // Add Android-specific dependencies here. Note that this source set depends on
-                // commonMain by default and will correctly pull the Android artifacts of any KMP
-                // dependencies declared in commonMain.
+                implementation(libs.androidx.compose.ui.tooling.android)
             }
         }
 

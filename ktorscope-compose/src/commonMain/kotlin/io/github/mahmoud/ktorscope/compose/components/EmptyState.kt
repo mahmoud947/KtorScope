@@ -15,7 +15,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import io.github.mahmoud.ktorscope.compose.KtorScopeTheme
+import io.github.mahmoud.ktorscope.compose.KtorScopeThemeMode
 
 @Composable
 internal fun EmptyState(modifier: Modifier = Modifier) {
@@ -42,5 +45,13 @@ private fun EmptyIllustration() {
         drawLine(primary, Offset(size.width * 0.28f, size.height * 0.52f), Offset(size.width * 0.72f, size.height * 0.52f), strokeWidth = 6f)
         drawLine(primary, Offset(size.width * 0.52f, size.height * 0.30f), Offset(size.width * 0.72f, size.height * 0.52f), strokeWidth = 6f)
         drawLine(primary, Offset(size.width * 0.52f, size.height * 0.74f), Offset(size.width * 0.72f, size.height * 0.52f), strokeWidth = 6f)
+    }
+}
+
+@Preview
+@Composable
+private fun EmptyStatePreview() {
+    KtorScopeTheme(KtorScopeThemeMode.Light) {
+        EmptyState()
     }
 }
