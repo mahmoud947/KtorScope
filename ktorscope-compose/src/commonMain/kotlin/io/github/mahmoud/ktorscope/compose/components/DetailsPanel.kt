@@ -3,21 +3,25 @@
  */
 package io.github.mahmoud.ktorscope.compose.components
 
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ElevatedCard
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.PrimaryTabRow
@@ -33,6 +37,9 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
@@ -127,7 +134,9 @@ internal fun DetailsPanel(
 
 @Composable
 private fun GraphQlSection(transaction: NetworkTransaction, onCopy: (String) -> Unit) {
-    val operation = transaction.graphQlOperation() ?: return
+    val operation = remember(transaction.id, transaction.request.body) {
+        transaction.graphQlOperation()
+    } ?: return
     SectionCard("GraphQL", action = {
         TextButton(onClick = { onCopy(operation.query) }) { Text("Copy query") }
     }) {
@@ -159,6 +168,17 @@ private fun SummaryCard(
                 MethodChip(transaction.request.method)
                 StatusChip(transaction)
                 transaction.durationMillis?.let { AssistChip(onClick = {}, label = { Text("${it}ms") }) }
+                Spacer(Modifier.weight(1f))
+                IconButton(
+                    onClick = {
+                        onShare(listOf(transaction).exportKtorScopeLogs(KtorScopeExportConfig()))
+                    },
+                ) {
+                    ShareIcon(
+                        color = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(22.dp),
+                    )
+                }
             }
             Text(transaction.request.url, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
             Row(
@@ -174,16 +194,39 @@ private fun SummaryCard(
                 OutlinedButton(onClick = { onCopy(transaction.toCurlCommand()) }, shape = RoundedCornerShape(14.dp)) {
                     Text("Copy cURL")
                 }
-                OutlinedButton(
-                    onClick = {
-                        onShare(listOf(transaction).exportKtorScopeLogs(KtorScopeExportConfig()))
-                    },
-                    shape = RoundedCornerShape(14.dp),
-                ) {
-                    Text("Share")
-                }
             }
         }
+    }
+}
+
+@Composable
+private fun ShareIcon(
+    color: Color,
+    modifier: Modifier = Modifier,
+) {
+    Canvas(modifier) {
+        val start = Offset(size.width * 0.30f, size.height * 0.50f)
+        val topEnd = Offset(size.width * 0.72f, size.height * 0.28f)
+        val bottomEnd = Offset(size.width * 0.72f, size.height * 0.72f)
+        val strokeWidth = 2.dp.toPx()
+
+        drawLine(
+            color = color,
+            start = start,
+            end = topEnd,
+            strokeWidth = strokeWidth,
+            cap = StrokeCap.Round,
+        )
+        drawLine(
+            color = color,
+            start = start,
+            end = bottomEnd,
+            strokeWidth = strokeWidth,
+            cap = StrokeCap.Round,
+        )
+        drawCircle(color = color, radius = 3.dp.toPx(), center = start)
+        drawCircle(color = color, radius = 3.dp.toPx(), center = topEnd)
+        drawCircle(color = color, radius = 3.dp.toPx(), center = bottomEnd)
     }
 }
 
@@ -215,7 +258,23 @@ private fun BodySection(
     var loadedBody by remember(filePath) { mutableStateOf<String?>(null) }
     var loading by remember(filePath) { mutableStateOf(false) }
     val visibleBody = loadedBody ?: body
-    val display = body?.prettyJsonOrSelf()
+    val previewDisplay = remember(body) { body?.prettyJsonOrSelf() }
+    val loadedDisplay = remember(loadedBody) { loadedBody?.prettyJsonOrSelf() }
+    val bodyDescription = remember(filePath, body, bodySizeBytes) {
+        when {
+            filePath != null -> "Stored as preview + file${bodySizeBytes?.let { " ($it B)" }.orEmpty()}"
+            body != null -> "Stored as database preview${bodySizeBytes?.let { " ($it B)" }.orEmpty()}"
+            else -> "No stored body"
+        }
+    }
+    val bodyText = remember(visibleBody, loadedBody, truncated, previewDisplay, loadedDisplay) {
+        when {
+            visibleBody == null -> "No body captured"
+            loadedBody != null -> loadedDisplay.orEmpty()
+            truncated -> "${previewDisplay.orEmpty()}\n\n[truncated]"
+            else -> previewDisplay.orEmpty()
+        }
+    }
     SectionCard("Body preview", action = {
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
             if (filePath != null) {
@@ -236,21 +295,12 @@ private fun BodySection(
         }
     }) {
         Text(
-            text = when {
-                filePath != null -> "Stored as preview + file${bodySizeBytes?.let { " ($it B)" }.orEmpty()}"
-                body != null -> "Stored as database preview${bodySizeBytes?.let { " ($it B)" }.orEmpty()}"
-                else -> "No stored body"
-            },
+            text = bodyDescription,
             style = MaterialTheme.typography.labelSmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         Text(
-            text = when {
-                visibleBody == null -> "No body captured"
-                loadedBody != null -> visibleBody.prettyJsonOrSelf()
-                truncated -> "${display.orEmpty()}\n\n[truncated]"
-                else -> display.orEmpty()
-            },
+            text = bodyText,
             style = MaterialTheme.typography.bodySmall,
             fontFamily = FontFamily.Monospace,
             color = MaterialTheme.colorScheme.onSurface,

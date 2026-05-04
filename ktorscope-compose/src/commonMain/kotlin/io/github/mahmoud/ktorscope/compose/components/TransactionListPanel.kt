@@ -216,6 +216,7 @@ internal fun TransactionListPanel(
                     items(
                         items = transactions,
                         key = { it.id },
+                        contentType = { "transaction" },
                     ) { transaction ->
                         TransactionCard(
                             transaction = transaction,
@@ -434,6 +435,24 @@ private fun TransactionCard(
     onClick: () -> Unit,
 ) {
     val tone = transaction.statusTone()
+    val host = remember(transaction.id, transaction.request.url) {
+        transaction.request.url.hostPart()
+    }
+    val path = remember(transaction.id, transaction.request.url) {
+        transaction.request.url.pathPart()
+    }
+    val timestamp = remember(transaction.id, transaction.createdAtMillis) {
+        transaction.createdAtMillis.timestampLabel()
+    }
+    val bodySize = remember(
+        transaction.id,
+        transaction.request.body,
+        transaction.request.bodySizeBytes,
+        transaction.response?.body,
+        transaction.response?.bodySizeBytes,
+    ) {
+        transaction.bodySizeLabel()
+    }
 
     val background by animateColorAsState(
         targetValue = if (selected) {
@@ -477,7 +496,7 @@ private fun TransactionCard(
 
             Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
                 Text(
-                    text = transaction.request.url.hostPart(),
+                    text = host,
                     style = MaterialTheme.typography.titleSmall,
                     fontWeight = FontWeight.SemiBold,
                     maxLines = 1,
@@ -485,7 +504,7 @@ private fun TransactionCard(
                 )
 
                 Text(
-                    text = transaction.request.url.pathPart(),
+                    text = path,
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 2,
@@ -499,13 +518,13 @@ private fun TransactionCard(
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Text(
-                    text = transaction.createdAtMillis.timestampLabel(),
+                    text = timestamp,
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
 
                 Text(
-                    text = transaction.bodySizeLabel(),
+                    text = bodySize,
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )

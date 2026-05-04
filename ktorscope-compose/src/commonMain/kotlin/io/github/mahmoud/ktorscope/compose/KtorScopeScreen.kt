@@ -134,7 +134,10 @@ private fun KtorScopeContent(
             matchesQuery && filter.matches(transaction)
         }
     }
-    val selected = transactions.firstOrNull { it.id == selectedId }
+    val selected = remember(transactions, selectedId) {
+        transactions.firstOrNull { it.id == selectedId }
+    }
+    val firstFiltered = remember(filtered) { filtered.firstOrNull() }
     val stats = remember(transactions) { transactions.toStats() }
 
     Surface(modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
@@ -175,7 +178,7 @@ private fun KtorScopeContent(
                     )
                     VerticalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.55f))
                     DetailsPanel(
-                        transaction = selected ?: filtered.firstOrNull(),
+                        transaction = selected ?: firstFiltered,
                         onBack = null,
                         onCopy = onCopy,
                         onShare = onShare,
@@ -187,7 +190,7 @@ private fun KtorScopeContent(
                 AnimatedContent(targetState = selectedId != null, label = "screen") { showingDetails ->
                     if (showingDetails) {
                         DetailsPanel(
-                            transaction = transactions.firstOrNull { it.id == selectedId },
+                            transaction = selected,
                             onBack = { selectedId = null },
                             onCopy = onCopy,
                             onShare = onShare,

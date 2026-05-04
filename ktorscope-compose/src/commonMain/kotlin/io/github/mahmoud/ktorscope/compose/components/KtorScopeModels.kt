@@ -3,6 +3,7 @@
  */
 package io.github.mahmoud.ktorscope.compose.components
 
+import androidx.compose.runtime.Immutable
 import androidx.compose.ui.graphics.Color
 import io.github.mahmoud.ktorscope.core.NetworkTransaction
 
@@ -35,6 +36,7 @@ enum class KtorScopeHistoryMode(val label: String) {
     All("All"),
 }
 
+@Immutable
 internal data class NetworkStats(
     val total: Int,
     val success: Int,
@@ -43,12 +45,30 @@ internal data class NetworkStats(
 )
 
 internal fun List<NetworkTransaction>.toStats(): NetworkStats {
-    val durations = mapNotNull { it.durationMillis }
+    var success = 0
+    var error = 0
+    var durationCount = 0
+    var durationTotal = 0L
+
+    forEach { transaction ->
+        val status = transaction.response?.statusCode
+        if (transaction.error == null && status in 200..399) {
+            success++
+        }
+        if (transaction.error != null || status in 400..599) {
+            error++
+        }
+        transaction.durationMillis?.let { duration ->
+            durationTotal += duration
+            durationCount++
+        }
+    }
+
     return NetworkStats(
         total = size,
-        success = count { it.error == null && it.response?.statusCode in 200..399 },
-        error = count { it.error != null || it.response?.statusCode in 400..599 },
-        averageDuration = if (durations.isEmpty()) 0 else durations.sum() / durations.size,
+        success = success,
+        error = error,
+        averageDuration = if (durationCount == 0) 0 else durationTotal / durationCount,
     )
 }
 
