@@ -5,12 +5,15 @@ package io.github.mahmoud.ktorscope.ktor
 
 import io.github.mahmoud.ktorscope.core.BodyPreview
 import io.github.mahmoud.ktorscope.core.KtorScopeConfig
+import io.github.mahmoud.ktorscope.core.KtorScopeHistoryPersistenceConfig
 import io.github.mahmoud.ktorscope.core.KtorScopePrettyPrintConfig
 import io.github.mahmoud.ktorscope.core.KtorScopeStore
 import io.github.mahmoud.ktorscope.core.NetworkError
+import io.github.mahmoud.ktorscope.core.KtorScopeHistoryPersistence
 import io.github.mahmoud.ktorscope.core.NetworkRequest
 import io.github.mahmoud.ktorscope.core.NetworkResponse
 import io.github.mahmoud.ktorscope.core.NetworkTransaction
+import io.github.mahmoud.ktorscope.core.NoOpKtorScopeHistoryPersistence
 import io.github.mahmoud.ktorscope.core.Redactor
 import io.github.mahmoud.ktorscope.core.prettyPrint
 import io.github.mahmoud.ktorscope.core.toBodyPreview
@@ -38,6 +41,12 @@ val KtorScope: ClientPlugin<KtorScopePluginConfig> = createClientPlugin(
     createConfiguration = ::KtorScopePluginConfig,
 ) {
     val config = pluginConfig.toCoreConfig()
+    if (config.persistHistory) {
+        config.store.enablePersistence(
+            persistence = config.persistence,
+            maxHistoryRecords = config.maxHistoryRecords,
+        )
+    }
     val prettyPrintEnabled = pluginConfig.prettyPrint
     val prettyPrintConfig = pluginConfig.prettyPrintConfig
     val logger = pluginConfig.logger
@@ -77,7 +86,12 @@ val KtorScope: ClientPlugin<KtorScopePluginConfig> = createClientPlugin(
         val request = call.request.attributes.getOrNull(requestKey)
             ?: call.request.toNetworkRequest(config = config)
         val responseBody = if (config.captureBodies) {
-            runCatching { response.bodyAsText().toBodyPreview(config.maxBodySize) }.getOrNull()
+            runCatching {
+                response.bodyAsText().toBodyPreview(
+                    maxBodySize = config.maxBodyPreviewSize.toPreviewSize(),
+                    keepFullBody = config.persistHistory,
+                )
+            }.getOrNull()
         } else {
             null
         }
@@ -94,6 +108,7 @@ val KtorScope: ClientPlugin<KtorScopePluginConfig> = createClientPlugin(
                 ),
                 body = responseBody?.value,
                 bodyTruncated = responseBody?.truncated ?: false,
+                bodySizeBytes = responseBody?.sourceSizeBytes,
             ),
             durationMillis = getTimeMillis() - startedAt,
             createdAtMillis = startedAt,
@@ -139,18 +154,98 @@ class KtorScopePluginConfig {
     var enabled: Boolean = true
     var captureBodies: Boolean = true
     var maxBodySize: Int = KtorScopeConfig.DEFAULT_MAX_BODY_SIZE
+    var maxBodyPreviewSize: Long = KtorScopeConfig.DEFAULT_MAX_BODY_PREVIEW_SIZE
+    var largeBodyFileThreshold: Long = KtorScopeConfig.DEFAULT_LARGE_BODY_FILE_THRESHOLD
+    var persistHistory: Boolean = false
+    var maxHistoryRecords: Int = KtorScopeStore.DEFAULT_MAX_HISTORY_RECORDS
     var redactHeaders: Set<String> = KtorScopeConfig.DEFAULT_REDACT_HEADERS
     var store: KtorScopeStore = KtorScopeStore.shared
+    var persistence: KtorScopeHistoryPersistence = NoOpKtorScopeHistoryPersistence
+    var historyPersistenceConfig: KtorScopeHistoryPersistenceConfig = KtorScopeHistoryPersistenceConfig()
     var prettyPrint: Boolean = false
     var prettyPrintConfig: KtorScopePrettyPrintConfig = KtorScopePrettyPrintConfig()
     var logger: (String) -> Unit = { message -> println(message) }
 
+    fun historyPersistence(
+        block: KtorScopeHistoryPersistenceConfigBuilder.() -> Unit,
+    ) {
+        historyPersistenceConfig = KtorScopeHistoryPersistenceConfigBuilder(historyPersistenceConfig)
+            .apply(block)
+            .build()
+    }
+
+    fun prettyPrintConfig(
+        block: KtorScopePrettyPrintConfigBuilder.() -> Unit,
+    ) {
+        prettyPrintConfig = KtorScopePrettyPrintConfigBuilder(prettyPrintConfig)
+            .apply(block)
+            .build()
+    }
+
     fun toCoreConfig(): KtorScopeConfig = KtorScopeConfig(
         enabled = enabled,
         captureBodies = captureBodies,
-        maxBodySize = maxBodySize,
+        persistHistory = resolvedHistoryConfig.enabled,
+        maxHistoryRecords = resolvedHistoryConfig.maxRecords,
+        maxBodyPreviewSize = resolvedHistoryConfig.maxBodyPreviewSize,
+        largeBodyFileThreshold = resolvedHistoryConfig.largeBodyFileThreshold,
         redactHeaders = redactHeaders,
         store = store,
+        persistence = resolvedHistoryConfig.persistence,
+    )
+
+    private val resolvedHistoryConfig: KtorScopeHistoryPersistenceConfig
+        get() {
+            val legacyPreviewSize = maxBodyPreviewSize.takeIf { it != KtorScopeConfig.DEFAULT_MAX_BODY_PREVIEW_SIZE }
+                ?: maxBodySize.toLong()
+            val legacyConfig = KtorScopeHistoryPersistenceConfig(
+                enabled = persistHistory,
+                maxRecords = maxHistoryRecords,
+                maxBodyPreviewSize = legacyPreviewSize,
+                largeBodyFileThreshold = largeBodyFileThreshold,
+                persistence = persistence,
+            )
+            return if (historyPersistenceConfig != KtorScopeHistoryPersistenceConfig()) {
+                historyPersistenceConfig
+            } else {
+                legacyConfig
+            }
+        }
+}
+
+class KtorScopeHistoryPersistenceConfigBuilder internal constructor(
+    config: KtorScopeHistoryPersistenceConfig,
+) {
+    var enabled: Boolean = config.enabled
+    var maxRecords: Int = config.maxRecords
+    var maxBodyPreviewSize: Long = config.maxBodyPreviewSize
+    var largeBodyFileThreshold: Long = config.largeBodyFileThreshold
+    var persistence: KtorScopeHistoryPersistence = config.persistence
+
+    fun build(): KtorScopeHistoryPersistenceConfig = KtorScopeHistoryPersistenceConfig(
+        enabled = enabled,
+        maxRecords = maxRecords,
+        maxBodyPreviewSize = maxBodyPreviewSize,
+        largeBodyFileThreshold = largeBodyFileThreshold,
+        persistence = persistence,
+    )
+}
+
+class KtorScopePrettyPrintConfigBuilder internal constructor(
+    config: KtorScopePrettyPrintConfig,
+) {
+    var includeHeaders: Boolean = config.includeHeaders
+    var includeBodies: Boolean = config.includeBodies
+    var includeCurl: Boolean = config.includeCurl
+    var includeGraphQl: Boolean = config.includeGraphQl
+    var prettyJson: Boolean = config.prettyJson
+
+    fun build(): KtorScopePrettyPrintConfig = KtorScopePrettyPrintConfig(
+        includeHeaders = includeHeaders,
+        includeBodies = includeBodies,
+        includeCurl = includeCurl,
+        includeGraphQl = includeGraphQl,
+        prettyJson = prettyJson,
     )
 }
 
@@ -159,7 +254,12 @@ private fun HttpRequestBuilder.toNetworkRequest(
     config: KtorScopeConfig,
 ): NetworkRequest {
     val body = if (config.captureBodies) {
-        runCatching { content?.previewBody(config.maxBodySize) }.getOrNull()
+        runCatching {
+            content?.previewBody(
+                maxBodySize = config.maxBodyPreviewSize.toPreviewSize(),
+                keepFullBody = config.persistHistory,
+            )
+        }.getOrNull()
     } else {
         null
     }
@@ -172,6 +272,7 @@ private fun HttpRequestBuilder.toNetworkRequest(
         ),
         body = body?.value,
         bodyTruncated = body?.truncated ?: false,
+        bodySizeBytes = body?.sourceSizeBytes,
     )
 }
 
@@ -186,11 +287,26 @@ private fun HttpRequest.toNetworkRequest(config: KtorScopeConfig): NetworkReques
     )
 }
 
-private fun OutgoingContent.previewBody(maxBodySize: Int): BodyPreview? {
+private fun OutgoingContent.previewBody(
+    maxBodySize: Int,
+    keepFullBody: Boolean,
+): BodyPreview? {
     return when (this) {
-        is TextContent -> text.toBodyPreview(maxBodySize)
-        is ByteArrayContent -> bytes().decodeToString().toBodyPreview(maxBodySize)
+        is TextContent -> text.toBodyPreview(maxBodySize, keepFullBody)
+        is ByteArrayContent -> bytes().decodeToString().toBodyPreview(maxBodySize, keepFullBody)
         else -> null
+    }
+}
+
+private fun String.toBodyPreview(
+    maxBodySize: Int,
+    keepFullBody: Boolean,
+): BodyPreview {
+    val preview = toBodyPreview(maxBodySize)
+    return if (keepFullBody && preview.truncated) {
+        preview.copy(value = this)
+    } else {
+        preview
     }
 }
 
@@ -201,3 +317,5 @@ private fun Headers.toMap(): Map<String, List<String>> {
 private fun newTransactionId(): String {
     return "ktorscope-${getTimeMillis()}-${Random.nextLong()}"
 }
+
+private fun Long.toPreviewSize(): Int = coerceAtMost(Int.MAX_VALUE.toLong()).toInt()

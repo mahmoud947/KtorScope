@@ -13,6 +13,7 @@ data class NetworkTransaction(
     val error: NetworkError? = null,
     val durationMillis: Long? = null,
     val createdAtMillis: Long,
+    val isFromCache: Boolean = false,
 ) {
     val isFailed: Boolean
         get() = error != null
@@ -27,6 +28,8 @@ data class NetworkRequest(
     val headers: Map<String, List<String>> = emptyMap(),
     val body: String? = null,
     val bodyTruncated: Boolean = false,
+    val bodyFilePath: String? = null,
+    val bodySizeBytes: Long? = null,
 )
 
 /**
@@ -38,6 +41,8 @@ data class NetworkResponse(
     val headers: Map<String, List<String>> = emptyMap(),
     val body: String? = null,
     val bodyTruncated: Boolean = false,
+    val bodyFilePath: String? = null,
+    val bodySizeBytes: Long? = null,
 )
 
 /**

@@ -14,6 +14,7 @@ The project currently targets Android and iOS.
 | --- | --- |
 | `ktorscope-core` | Shared models, store, redaction, body previews, cURL generation, GraphQL parsing, pretty printing, and log export helpers. |
 | `ktorscope-ktor` | Ktor Client plugin that records network transactions into `KtorScopeStore`. |
+| `ktorscope-persistence` | Optional Room KMP history persistence plus platform file storage for large bodies. |
 | `sample-compose-app` | Android/iOS sample app that wires the library together. |
 
 ## Quick Start
@@ -25,6 +26,7 @@ commonMain.dependencies {
     implementation(projects.ktorscopeCore)
     implementation(projects.ktorscopeKtor)
     implementation(projects.ktorscopeCompose)
+    implementation(projects.ktorscopePersistence) // optional Room history
 }
 ```
 
@@ -35,13 +37,13 @@ commonMain.dependencies {
     implementation("io.github.mahmoud.ktorscope:ktorscope-core:<version>")
     implementation("io.github.mahmoud.ktorscope:ktorscope-ktor:<version>")
     implementation("io.github.mahmoud.ktorscope:ktorscope-compose:<version>")
+    implementation("io.github.mahmoud.ktorscope:ktorscope-persistence:<version>")
 }
 ```
 
 Install the plugin in your Ktor client:
 
 ```kotlin
-import io.github.mahmoud.ktorscope.core.KtorScopePrettyPrintConfig
 import io.github.mahmoud.ktorscope.ktor.KtorScope
 import io.ktor.client.HttpClient
 
@@ -52,7 +54,9 @@ val client = HttpClient {
         maxBodySize = 250_000
         redactHeaders = setOf("Authorization", "Cookie", "Set-Cookie", "X-Api-Key")
         prettyPrint = true
-        prettyPrintConfig = KtorScopePrettyPrintConfig(includeCurl = true)
+        prettyPrintConfig {
+            includeCurl = true
+        }
         logger = { message -> println(message) }
     }
 }

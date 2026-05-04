@@ -9,11 +9,33 @@ import io.github.mahmoud.ktorscope.core.KtorScopeStore
 
 val store = KtorScopeStore()
 val transactions = store.transactions
+val persistedTransactions = store.persistedTransactions
 
 store.clear()
 ```
 
 `transactions` is a `StateFlow<List<NetworkTransaction>>`. New transactions are inserted at the beginning of the list.
+
+`persistedTransactions` is a `StateFlow<List<NetworkTransaction>>` populated only when optional persistence is enabled.
+
+## Optional Session Persistence
+
+KtorScope stays in memory by default. To persist historical transactions, use `KtorScopeHistoryPersistence`:
+
+```kotlin
+import io.github.mahmoud.ktorscope.core.KtorScopeStore
+import io.github.mahmoud.ktorscope.persistence.createRoomKtorScopeHistoryPersistence
+
+val persistence = createRoomKtorScopeHistoryPersistence(context)
+
+val store = KtorScopeStore(
+    persistHistory = true,
+    persistence = persistence,
+    maxHistoryRecords = 500,
+)
+```
+
+Core defines only the interface and no-op implementation, so Room stays optional. Call `store.clearMemory()` for current in-memory logs only, `store.clearPersistedHistory()` for persisted history, or `store.clear()` for both when persistence is enabled.
 
 ## Models
 

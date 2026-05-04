@@ -25,6 +25,7 @@ import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -43,6 +44,7 @@ import io.github.mahmoud.ktorscope.core.NetworkTransaction
 import io.github.mahmoud.ktorscope.core.exportKtorScopeLogs
 import io.github.mahmoud.ktorscope.core.graphQlOperation
 import io.github.mahmoud.ktorscope.core.toCurlCommand
+import kotlinx.coroutines.launch
 
 @Composable
 internal fun DetailsPanel(
@@ -50,6 +52,7 @@ internal fun DetailsPanel(
     onBack: (() -> Unit)?,
     onCopy: (String) -> Unit,
     onShare: (String) -> Unit,
+    onLoadFullBody: suspend (String) -> String? = { null },
     modifier: Modifier = Modifier,
 ) {
     if (transaction == null) {
@@ -78,7 +81,14 @@ internal fun DetailsPanel(
                 0 -> {
                     GraphQlSection(transaction, onCopy)
                     HeadersSection(transaction.request.headers, onCopy)
-                    BodySection(transaction.request.body, transaction.request.bodyTruncated, onCopy)
+                    BodySection(
+                        body = transaction.request.body,
+                        truncated = transaction.request.bodyTruncated,
+                        filePath = transaction.request.bodyFilePath,
+                        bodySizeBytes = transaction.request.bodySizeBytes,
+                        onCopy = onCopy,
+                        onLoadFullBody = onLoadFullBody,
+                    )
                 }
                 1 -> {
                     val response = transaction.response
@@ -89,7 +99,14 @@ internal fun DetailsPanel(
                             Text("${response.statusCode} ${response.statusDescription}", fontWeight = FontWeight.SemiBold)
                         }
                         HeadersSection(response.headers, onCopy)
-                        BodySection(response.body, response.bodyTruncated, onCopy)
+                        BodySection(
+                            body = response.body,
+                            truncated = response.bodyTruncated,
+                            filePath = response.bodyFilePath,
+                            bodySizeBytes = response.bodySizeBytes,
+                            onCopy = onCopy,
+                            onLoadFullBody = onLoadFullBody,
+                        )
                     }
                 }
                 2 -> {
@@ -186,16 +203,53 @@ private fun HeadersSection(headers: Map<String, List<String>>, onCopy: (String) 
 }
 
 @Composable
-private fun BodySection(body: String?, truncated: Boolean, onCopy: (String) -> Unit) {
+private fun BodySection(
+    body: String?,
+    truncated: Boolean,
+    filePath: String?,
+    bodySizeBytes: Long?,
+    onCopy: (String) -> Unit,
+    onLoadFullBody: suspend (String) -> String?,
+) {
+    val scope = rememberCoroutineScope()
+    var loadedBody by remember(filePath) { mutableStateOf<String?>(null) }
+    var loading by remember(filePath) { mutableStateOf(false) }
+    val visibleBody = loadedBody ?: body
     val display = body?.prettyJsonOrSelf()
     SectionCard("Body preview", action = {
-        TextButton(enabled = body != null, onClick = { if (body != null) onCopy(body) }) { Text("Copy") }
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+            if (filePath != null) {
+                TextButton(
+                    enabled = !loading,
+                    onClick = {
+                        loading = true
+                        scope.launch {
+                            loadedBody = onLoadFullBody(filePath)
+                            loading = false
+                        }
+                    },
+                ) {
+                    Text(if (loading) "Loading" else "Load full body")
+                }
+            }
+            TextButton(enabled = visibleBody != null, onClick = { visibleBody?.let(onCopy) }) { Text("Copy") }
+        }
     }) {
         Text(
             text = when {
-                display == null -> "No body captured"
-                truncated -> "$display\n\n[truncated]"
-                else -> display
+                filePath != null -> "Stored as preview + file${bodySizeBytes?.let { " ($it B)" }.orEmpty()}"
+                body != null -> "Stored as database preview${bodySizeBytes?.let { " ($it B)" }.orEmpty()}"
+                else -> "No stored body"
+            },
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Text(
+            text = when {
+                visibleBody == null -> "No body captured"
+                loadedBody != null -> visibleBody.prettyJsonOrSelf()
+                truncated -> "${display.orEmpty()}\n\n[truncated]"
+                else -> display.orEmpty()
             },
             style = MaterialTheme.typography.bodySmall,
             fontFamily = FontFamily.Monospace,

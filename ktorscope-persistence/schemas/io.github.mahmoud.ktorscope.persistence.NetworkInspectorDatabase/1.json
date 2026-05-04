@@ -1,0 +1,178 @@
+{
+  "formatVersion": 1,
+  "database": {
+    "version": 1,
+    "identityHash": "7a5ca3dc838364ef93b90ec8e0bb24ad",
+    "entities": [
+      {
+        "tableName": "network_transactions",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` TEXT NOT NULL, `method` TEXT NOT NULL, `url` TEXT NOT NULL, `host` TEXT, `path` TEXT, `statusCode` INTEGER, `durationMs` INTEGER, `timestampMs` INTEGER NOT NULL, `requestHeadersJson` TEXT, `responseHeadersJson` TEXT, `requestBodyPreview` TEXT, `responseBodyPreview` TEXT, `requestBodyFilePath` TEXT, `responseBodyFilePath` TEXT, `requestBodySizeBytes` INTEGER, `responseBodySizeBytes` INTEGER, `errorMessage` TEXT, `errorType` TEXT, `isFromCache` INTEGER NOT NULL, `createdAtMs` INTEGER NOT NULL, PRIMARY KEY(`id`))",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "method",
+            "columnName": "method",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "url",
+            "columnName": "url",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "host",
+            "columnName": "host",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "path",
+            "columnName": "path",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "statusCode",
+            "columnName": "statusCode",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "durationMs",
+            "columnName": "durationMs",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "timestampMs",
+            "columnName": "timestampMs",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "requestHeadersJson",
+            "columnName": "requestHeadersJson",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "responseHeadersJson",
+            "columnName": "responseHeadersJson",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "requestBodyPreview",
+            "columnName": "requestBodyPreview",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "responseBodyPreview",
+            "columnName": "responseBodyPreview",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "requestBodyFilePath",
+            "columnName": "requestBodyFilePath",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "responseBodyFilePath",
+            "columnName": "responseBodyFilePath",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "requestBodySizeBytes",
+            "columnName": "requestBodySizeBytes",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "responseBodySizeBytes",
+            "columnName": "responseBodySizeBytes",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "errorMessage",
+            "columnName": "errorMessage",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "errorType",
+            "columnName": "errorType",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "isFromCache",
+            "columnName": "isFromCache",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "createdAtMs",
+            "columnName": "createdAtMs",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_network_transactions_timestampMs",
+            "unique": false,
+            "columnNames": [
+              "timestampMs"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_network_transactions_timestampMs` ON `${TABLE_NAME}` (`timestampMs`)"
+          },
+          {
+            "name": "index_network_transactions_method",
+            "unique": false,
+            "columnNames": [
+              "method"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_network_transactions_method` ON `${TABLE_NAME}` (`method`)"
+          },
+          {
+            "name": "index_network_transactions_statusCode",
+            "unique": false,
+            "columnNames": [
+              "statusCode"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_network_transactions_statusCode` ON `${TABLE_NAME}` (`statusCode`)"
+          },
+          {
+            "name": "index_network_transactions_host",
+            "unique": false,
+            "columnNames": [
+              "host"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_network_transactions_host` ON `${TABLE_NAME}` (`host`)"
+          },
+          {
+            "name": "index_network_transactions_url",
+            "unique": false,
+            "columnNames": [
+              "url"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_network_transactions_url` ON `${TABLE_NAME}` (`url`)"
+          }
+        ]
+      }
+    ],
+    "setupQueries": [
+      "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '7a5ca3dc838364ef93b90ec8e0bb24ad')"
+    ]
+  }
+}

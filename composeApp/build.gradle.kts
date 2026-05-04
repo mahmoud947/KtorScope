@@ -39,6 +39,7 @@ kotlin {
             implementation(projects.ktorscopeCore)
             implementation(projects.ktorscopeKtor)
             implementation(projects.ktorscopeCompose)
+            implementation(projects.ktorscopePersistence)
             implementation(libs.compose.runtime)
             implementation(libs.compose.foundation)
             implementation(libs.compose.material3)
@@ -85,4 +86,3 @@ android {
 dependencies {
     debugImplementation(libs.compose.uiTooling)
 }
-

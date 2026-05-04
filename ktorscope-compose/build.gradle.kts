@@ -14,6 +14,7 @@ kotlin {
     androidLibrary {
         namespace = "io.github.mahmoud.ktorscope_compose"
         compileSdk = 36
+        androidResources.enable = true
         minSdk = 24
     }
 
@@ -58,7 +59,9 @@ kotlin {
                 api(libs.compose.foundation)
                 api(libs.compose.material3)
                 api(libs.compose.ui)
+                implementation(compose.components.resources)
                 implementation(libs.compose.uiToolingPreview)
+                implementation(libs.components.resources.v173)
             }
         }
 

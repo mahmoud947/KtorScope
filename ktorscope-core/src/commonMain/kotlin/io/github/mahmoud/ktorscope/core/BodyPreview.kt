@@ -6,6 +6,7 @@ package io.github.mahmoud.ktorscope.core
 data class BodyPreview(
     val value: String,
     val truncated: Boolean,
+    val sourceSizeBytes: Long = value.encodeToByteArray().size.toLong(),
 )
 
 fun String.toBodyPreview(maxBodySize: Int): BodyPreview {

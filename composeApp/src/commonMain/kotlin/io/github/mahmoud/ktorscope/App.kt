@@ -14,8 +14,10 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import io.github.mahmoud.ktorscope.compose.KtorScopeScreen
-import io.github.mahmoud.ktorscope.core.KtorScopePrettyPrintConfig
+import io.github.mahmoud.ktorscope.compose.KtorScopeThemeMode
+import io.github.mahmoud.ktorscope.core.KtorScopeHistoryPersistence
 import io.github.mahmoud.ktorscope.ktor.KtorScope
+import io.github.mahmoud.ktorscope.persistence.KtorScopePersistence
 import io.ktor.client.HttpClient
 import io.ktor.client.call.body
 import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
@@ -31,15 +33,23 @@ import io.ktor.http.contentType
 import kotlinx.coroutines.launch
 
 @Composable
-fun App() {
+fun App(
+    ktorScopePersistence: KtorScopePersistence
+) {
     MaterialTheme {
         var showInspector by remember { mutableStateOf(false) }
         val scope = rememberCoroutineScope()
-        val client = rememberSampleClient()
+        val networkPersistence = remember {  ktorScopePersistence}
+        val client = rememberSampleClient(networkPersistence.historyPersistence)
         var status by remember { mutableStateOf("Ready") }
 
         if (showInspector) {
-            KtorScopeScreen(onBackClicked = { showInspector = false })
+            KtorScopeScreen(
+                onBackClicked = { showInspector = false },
+                themeMode = KtorScopeThemeMode.Dark,
+                persistHistory = true,
+                onLoadFullBody = networkPersistence.bodyFileStore::readBody,
+            )
         } else {
             Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
                 Column(
@@ -53,12 +63,17 @@ fun App() {
                     RequestButtons(
                         onSuccess = {
                             scope.launch {
-                                status = runSampleCall { client.get("https://httpbin.org/get").body<String>() }
+                                status = runSampleCall {
+                                    client.get("https://httpbin.org/get").body<String>()
+                                }
                             }
                         },
                         onFailure = {
                             scope.launch {
-                                status = runSampleCall { client.get("https://invalid.ktorscope.local/failure").body<String>() }
+                                status = runSampleCall {
+                                    client.get("https://invalid.ktorscope.local/failure")
+                                        .body<String>()
+                                }
                             }
                         },
                         onPost = {
@@ -75,7 +90,9 @@ fun App() {
                         },
                         onDelayed = {
                             scope.launch {
-                                status = runSampleCall { client.get("https://httpbin.org/delay/2").body<String>() }
+                                status = runSampleCall {
+                                    client.get("https://httpbin.org/delay/2").body<String>()
+                                }
                             }
                         },
                         onPut = {
@@ -100,7 +117,9 @@ fun App() {
                         },
                         onDelete = {
                             scope.launch {
-                                status = runSampleCall { client.delete("https://httpbin.org/delete").body<String>() }
+                                status = runSampleCall {
+                                    client.delete("https://httpbin.org/delete").body<String>()
+                                }
                             }
                         },
                         onGraphQl = {
@@ -132,23 +151,30 @@ fun App() {
 }
 
 @Composable
-private fun rememberSampleClient(): HttpClient {
-    return remember {
+private fun rememberSampleClient(
+    persistence: KtorScopeHistoryPersistence,
+): HttpClient {
+    return remember(persistence) {
         HttpClient {
             install(ContentNegotiation)
             install(KtorScope) {
                 enabled = true
                 captureBodies = true
                 maxBodySize = 250_000
+                historyPersistence {
+                    enabled = true
+                    maxRecords = 300
+                    this.persistence = persistence
+                }
                 redactHeaders = setOf("Authorization", "Cookie", "Set-Cookie", "X-Api-Key")
                 prettyPrint = true
-                prettyPrintConfig = KtorScopePrettyPrintConfig(
-                    includeHeaders = true,
-                    includeBodies = true,
-                    includeCurl = true,
-                    includeGraphQl = true,
-                    prettyJson = true,
-                )
+                prettyPrintConfig {
+                    includeHeaders = true
+                    includeBodies = true
+                    includeCurl = true
+                    includeGraphQl = true
+                    prettyJson = true
+                }
                 logger = { message -> println(message) }
             }
         }

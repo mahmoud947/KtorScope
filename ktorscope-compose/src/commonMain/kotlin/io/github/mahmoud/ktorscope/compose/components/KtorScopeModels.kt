@@ -29,6 +29,12 @@ internal enum class TransactionFilter(val label: String) {
     }
 }
 
+enum class KtorScopeHistoryMode(val label: String) {
+    CurrentSession("Current session"),
+    PersistedHistory("Persisted history"),
+    All("All"),
+}
+
 internal data class NetworkStats(
     val total: Int,
     val success: Int,
@@ -59,8 +65,10 @@ internal fun NetworkTransaction.statusTone(): Color {
 internal fun NetworkTransaction.bodySizeLabel(): String {
     val requestSize = request.body?.length ?: 0
     val responseSize = response?.body?.length ?: 0
-    val total = requestSize + responseSize
-    return if (total == 0) "No body" else "$total B"
+    val requestStoredSize = request.bodySizeBytes ?: requestSize.toLong()
+    val responseStoredSize = response?.bodySizeBytes ?: responseSize.toLong()
+    val total = requestStoredSize + responseStoredSize
+    return if (total == 0L) "No body" else "$total B"
 }
 
 internal fun String.hostPart(): String {

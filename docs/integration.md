@@ -72,7 +72,34 @@ val client = HttpClient {
 
 Use a custom store when you want isolated clients, tests, or multiple inspector sessions.
 
-## 4. Render the Inspector
+## 4. Optional Historical Session Persistence
+
+By default, KtorScope is in-memory only. If you want historical transactions across launches, add `ktorscope-persistence` and pass an opt-in Room adapter:
+
+```kotlin
+import io.github.mahmoud.ktorscope.persistence.createRoomKtorScopeHistoryPersistence
+import io.github.mahmoud.ktorscope.persistence.rememberKtorScopeHistoryPersistence
+
+val ktorScopePersistence = rememberKtorScopeHistoryPersistence()
+
+val client = HttpClient {
+    install(KtorScope) {
+        enabled = true
+        captureBodies = true
+        historyPersistence {
+            enabled = true
+            maxRecords = 500
+            maxBodyPreviewSize = 250_000
+            largeBodyFileThreshold = 250_000
+            this.persistence = ktorScopePersistence.historyPersistence
+        }
+    }
+}
+```
+
+Room dependencies stay out of `ktorscope-core`, `ktorscope-ktor`, and `ktorscope-compose`.
+
+## 5. Render the Inspector
 
 ```kotlin
 import androidx.compose.runtime.Composable
@@ -86,24 +113,27 @@ fun DebugNetworkScreen(
 ) {
     KtorScopeScreen(
         store = store,
+        persistHistory = true,
+        onLoadFullBody = ktorScopePersistence.bodyFileStore::readBody,
         onBackClicked = onClose,
     )
 }
 ```
 
-If you use the default `KtorScopeStore.shared`, you can omit the `store` parameter.
+If you use the default `KtorScopeStore.shared`, you can omit the `store` parameter. Pass `persistHistory = true` to show the current-session, persisted-history, and all-history filters.
 
-## 5. Inspect Data Without UI
+## 6. Inspect Data Without UI
 
 ```kotlin
 import io.github.mahmoud.ktorscope.core.KtorScopeStore
 
 val currentTransactions = KtorScopeStore.shared.transactions.value
+val persistedTransactions = KtorScopeStore.shared.persistedTransactions.value
 ```
 
 `transactions` is a `StateFlow<List<NetworkTransaction>>`, so non-Compose code can collect it directly.
 
-## 6. Export Logs
+## 7. Export Logs
 
 ```kotlin
 import io.github.mahmoud.ktorscope.core.exportLogs

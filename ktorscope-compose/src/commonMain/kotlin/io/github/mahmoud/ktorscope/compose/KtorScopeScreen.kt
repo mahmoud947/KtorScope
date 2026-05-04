@@ -24,6 +24,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import io.github.mahmoud.ktorscope.compose.components.DetailsPanel
+import io.github.mahmoud.ktorscope.compose.components.KtorScopeHistoryMode
 import io.github.mahmoud.ktorscope.compose.components.KtorScopePreviewData
 import io.github.mahmoud.ktorscope.compose.components.TransactionFilter
 import io.github.mahmoud.ktorscope.compose.components.TransactionListPanel
@@ -44,6 +45,8 @@ fun KtorScopeScreen(
     onThemeModeChange: (KtorScopeThemeMode) -> Unit = {},
     onCopy: (String) -> Unit = DefaultCopyHandler,
     onShare: (String) -> Unit = DefaultShareHandler,
+    persistHistory: Boolean = false,
+    onLoadFullBody: suspend (String) -> String? = { null },
 ) {
     var currentThemeMode by remember { mutableStateOf(themeMode) }
     val platformCopy = rememberKtorScopeClipboard()
@@ -64,6 +67,8 @@ fun KtorScopeScreen(
                 onBackClicked = onBackClicked,
                 onCopy = copyHandler,
                 onShare = shareHandler,
+                persistHistory = persistHistory,
+                onLoadFullBody = onLoadFullBody,
             )
         }
     }
@@ -100,11 +105,28 @@ private fun KtorScopeContent(
     onBackClicked: (() -> Unit)?,
     onCopy: (String) -> Unit,
     onShare: (String) -> Unit,
+    persistHistory: Boolean,
+    onLoadFullBody: suspend (String) -> String?,
 ) {
-    val transactions by store.transactions.collectAsState()
+    val currentTransactions by store.transactions.collectAsState()
+    val persistedTransactions by store.persistedTransactions.collectAsState()
     var selectedId by remember { mutableStateOf<String?>(null) }
     var query by remember { mutableStateOf("") }
     var filter by remember { mutableStateOf(TransactionFilter.All) }
+    var historyMode by remember { mutableStateOf(KtorScopeHistoryMode.CurrentSession) }
+    val transactions = remember(currentTransactions, persistedTransactions, historyMode, persistHistory) {
+        if (!persistHistory) {
+            currentTransactions
+        } else {
+            when (historyMode) {
+                KtorScopeHistoryMode.CurrentSession -> currentTransactions
+                KtorScopeHistoryMode.PersistedHistory -> persistedTransactions
+                KtorScopeHistoryMode.All -> (currentTransactions + persistedTransactions)
+                    .distinctBy { it.id }
+                    .sortedByDescending { it.createdAtMillis }
+            }
+        }
+    }
     val filtered = remember(transactions, query, filter) {
         transactions.filter { transaction ->
             val matchesQuery = query.isBlank() ||
@@ -128,14 +150,24 @@ private fun KtorScopeContent(
                         filter = filter,
                         onFilterChange = { filter = it },
                         stats = stats,
+                        historyMode = historyMode,
+                        persistHistory = persistHistory,
                         themeMode = themeMode,
                         onThemeModeChange = onThemeModeChange,
+                        onHistoryModeChange = {
+                            historyMode = it
+                            selectedId = null
+                        },
                         onBackClicked = onBackClicked,
                         onShareLogs = {
                             onShare(filtered.exportKtorScopeLogs(KtorScopeExportConfig()))
                         },
                         onClear = {
                             store.clear()
+                            selectedId = null
+                        },
+                        onClearPersistedHistory = {
+                            store.clearPersistedHistory()
                             selectedId = null
                         },
                         onSelect = { selectedId = it.id },
@@ -147,6 +179,7 @@ private fun KtorScopeContent(
                         onBack = null,
                         onCopy = onCopy,
                         onShare = onShare,
+                        onLoadFullBody = onLoadFullBody,
                         modifier = Modifier.weight(1f).fillMaxHeight(),
                     )
                 }
@@ -158,6 +191,7 @@ private fun KtorScopeContent(
                             onBack = { selectedId = null },
                             onCopy = onCopy,
                             onShare = onShare,
+                            onLoadFullBody = onLoadFullBody,
                             modifier = Modifier.fillMaxSize(),
                         )
                     } else {
@@ -169,13 +203,23 @@ private fun KtorScopeContent(
                             filter = filter,
                             onFilterChange = { filter = it },
                             stats = stats,
+                            historyMode = historyMode,
+                            persistHistory = persistHistory,
                             themeMode = themeMode,
                             onThemeModeChange = onThemeModeChange,
+                            onHistoryModeChange = {
+                                historyMode = it
+                                selectedId = null
+                            },
                             onBackClicked = onBackClicked,
                             onShareLogs = {
                                 onShare(filtered.exportKtorScopeLogs(KtorScopeExportConfig()))
                             },
                             onClear = { store.clear() },
+                            onClearPersistedHistory = {
+                                store.clearPersistedHistory()
+                                selectedId = null
+                            },
                             onSelect = { selectedId = it.id },
                             modifier = Modifier.fillMaxSize(),
                         )

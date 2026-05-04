@@ -7,6 +7,12 @@ install(KtorScope) {
     enabled = true
     captureBodies = true
     maxBodySize = 250_000
+    historyPersistence {
+        enabled = false
+        maxRecords = 500
+        maxBodyPreviewSize = 250_000
+        largeBodyFileThreshold = 250_000
+    }
     redactHeaders = setOf("Authorization", "Cookie", "Set-Cookie", "X-Api-Key")
     store = KtorScopeStore.shared
     prettyPrint = false
@@ -21,7 +27,9 @@ install(KtorScope) {
 | `enabled` | `true` | Turns capture on or off without removing the plugin. |
 | `captureBodies` | `true` | Captures supported request and response body previews. |
 | `maxBodySize` | `250_000` | Maximum captured body preview length. Longer bodies are truncated. |
-| `redactHeaders` | `Authorization`, `Cookie`, `Set-Cookie`, `X-Api-Key` | Case-insensitive header names to redact before storage. |
+| `historyPersistenceConfig` | `KtorScopeHistoryPersistenceConfig()` | Optional persistence config. Room lives in `ktorscope-persistence`, not core. |
+| `historyPersistence { ... }` | disabled | Builder for enabling persistence, max records, body preview size, large-body threshold, and adapter. |
+| `redactHeaders` | `Authorization`, `Cookie`, `Set-Cookie`, `X-Api-Key`, `Api-Key`, `access_token`, `refresh_token` | Case-insensitive header names to redact before storage. |
 | `store` | `KtorScopeStore.shared` | Destination store for captured transactions. |
 | `prettyPrint` | `false` | Logs each captured transaction through `logger`. |
 | `prettyPrintConfig` | `KtorScopePrettyPrintConfig()` | Controls printed headers, bodies, cURL, GraphQL, and JSON formatting. |
@@ -55,20 +63,80 @@ install(KtorScope) {
 
 Header matching is case-insensitive. Redacted values are replaced with a block marker.
 
+## Optional Persistence
+
+KtorScope is in-memory by default:
+
+```kotlin
+val client = HttpClient {
+    install(KtorScope) {
+        enabled = true
+        captureBodies = true
+    }
+}
+```
+
+Room persistence is opt-in from the separate persistence module:
+
+```kotlin
+import io.github.mahmoud.ktorscope.persistence.createRoomKtorScopeHistoryPersistence
+
+val persistence = createRoomKtorScopeHistoryPersistence(
+    context = context,
+    databaseName = "network_inspector.db",
+)
+
+val client = HttpClient {
+    install(KtorScope) {
+        enabled = true
+        captureBodies = true
+        historyPersistence {
+            enabled = true
+            maxRecords = 500
+            maxBodyPreviewSize = 250_000
+            largeBodyFileThreshold = 250_000
+            this.persistence = persistence
+        }
+    }
+}
+```
+
+Room stores searchable metadata and body previews. The persistence module can store larger body content in platform files and expose the file path on the domain model for the details screen.
+
+In Compose apps, use the built-in helper so you do not need app-level `expect`/`actual` setup:
+
+```kotlin
+import io.github.mahmoud.ktorscope.persistence.rememberKtorScopeHistoryPersistence
+
+val ktorScopePersistence = rememberKtorScopeHistoryPersistence()
+
+val client = HttpClient {
+    install(KtorScope) {
+        historyPersistence {
+            enabled = true
+            this.persistence = ktorScopePersistence.historyPersistence
+        }
+    }
+}
+
+KtorScopeScreen(
+    persistHistory = true,
+    onLoadFullBody = ktorScopePersistence.bodyFileStore::readBody,
+)
+```
+
 ## Pretty Printing
 
 ```kotlin
-import io.github.mahmoud.ktorscope.core.KtorScopePrettyPrintConfig
-
 install(KtorScope) {
     prettyPrint = true
-    prettyPrintConfig = KtorScopePrettyPrintConfig(
-        includeHeaders = true,
-        includeBodies = true,
-        includeCurl = true,
-        includeGraphQl = true,
-        prettyJson = true,
-    )
+    prettyPrintConfig {
+        includeHeaders = true
+        includeBodies = true
+        includeCurl = true
+        includeGraphQl = true
+        prettyJson = true
+    }
     logger = { message -> println(message) }
 }
 ```
