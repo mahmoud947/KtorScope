@@ -4,7 +4,11 @@ plugins {
     alias(libs.plugins.ksp)
     alias(libs.plugins.androidx.room)
     alias(libs.plugins.composeCompiler)
+    id("maven-publish")
+    id("signing")
 }
+
+description = "Room-backed multiplatform history persistence for KtorScope."
 
 kotlin {
     androidTarget()

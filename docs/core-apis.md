@@ -24,18 +24,23 @@ KtorScope stays in memory by default. To persist historical transactions, use `K
 
 ```kotlin
 import io.github.mahmoud.ktorscope.core.KtorScopeStore
-import io.github.mahmoud.ktorscope.persistence.createRoomKtorScopeHistoryPersistence
+import io.github.mahmoud.ktorscope.persistence.ScopPersistenceFactory
 
-val persistence = createRoomKtorScopeHistoryPersistence(context)
+val ktorScopePersistence = ScopPersistenceFactory(context).create(
+    databaseName = "network_inspector.db",
+    bodyDirectoryName = "network_inspector_bodies",
+)
 
 val store = KtorScopeStore(
     persistHistory = true,
-    persistence = persistence,
+    persistence = ktorScopePersistence.historyPersistence,
     maxHistoryRecords = 500,
 )
 ```
 
-Core defines only the interface and no-op implementation, so Room stays optional. Call `store.clearMemory()` for current in-memory logs only, `store.clearPersistedHistory()` for persisted history, or `store.clear()` for both when persistence is enabled.
+The example above shows Android factory creation; iOS uses `ScopPersistenceFactory().create(...)`.
+
+Core defines only the interface and no-op implementation, so Room stays optional. The persistence module provides `ScopPersistenceFactory`, which creates a `KtorScopePersistence` containing the history adapter and the body file store. Call `store.clearMemory()` for current in-memory logs only, `store.clearPersistedHistory()` for persisted history, or `store.clear()` for both when persistence is enabled.
 
 ## Models
 

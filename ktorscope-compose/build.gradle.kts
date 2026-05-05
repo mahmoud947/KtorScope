@@ -4,7 +4,11 @@ plugins {
     alias(libs.plugins.androidLint)
     alias(libs.plugins.composeMultiplatform)
     alias(libs.plugins.composeCompiler)
+    id("maven-publish")
+    id("signing")
 }
+
+description = "Compose Multiplatform network inspector UI for KtorScope."
 
 kotlin {
 

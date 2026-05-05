@@ -2,7 +2,11 @@ plugins {
     alias(libs.plugins.kotlinMultiplatform)
     alias(libs.plugins.androidKotlinMultiplatformLibrary)
     alias(libs.plugins.androidLint)
+    id("maven-publish")
+    id("signing")
 }
+
+description = "Core Kotlin Multiplatform network inspection models and store for KtorScope."
 
 kotlin {
 

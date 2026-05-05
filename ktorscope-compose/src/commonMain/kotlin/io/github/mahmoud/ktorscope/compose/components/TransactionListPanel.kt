@@ -58,9 +58,10 @@ import androidx.compose.ui.unit.dp
 import io.github.mahmoud.ktorscope.compose.KtorScopeTheme
 import io.github.mahmoud.ktorscope.compose.KtorScopeThemeMode
 import io.github.mahmoud.ktorscope.core.NetworkTransaction
-import ktorscope.ktorscope_compose.generated.resources.Res
-import ktorscope.ktorscope_compose.generated.resources.keyboard_arrow_up
-import ktorscope.ktorscope_compose.generated.resources.search
+import io.github.mahmoud947.ktorscope_compose.generated.resources.Res
+import io.github.mahmoud947.ktorscope_compose.generated.resources.keyboard_arrow_up
+import io.github.mahmoud947.ktorscope_compose.generated.resources.search
+
 import org.jetbrains.compose.resources.painterResource
 
 /**

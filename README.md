@@ -14,12 +14,12 @@ The project currently targets Android and iOS.
 | --- | --- |
 | `ktorscope-core` | Shared models, store, redaction, body previews, cURL generation, GraphQL parsing, pretty printing, and log export helpers. |
 | `ktorscope-ktor` | Ktor Client plugin that records network transactions into `KtorScopeStore`. |
+| `ktorscope-compose` | Compose Multiplatform inspector UI, clipboard/share hooks, and transaction details screens. |
 | `ktorscope-persistence` | Optional Room KMP history persistence plus platform file storage for large bodies. |
-| `sample-compose-app` | Android/iOS sample app that wires the library together. |
 
 ## Quick Start
 
-Add the modules you need. Inside this repository, the sample uses project dependencies:
+Add the modules you need. Inside this repository, use project dependencies:
 
 ```kotlin
 commonMain.dependencies {
@@ -30,14 +30,14 @@ commonMain.dependencies {
 }
 ```
 
-For a published Maven setup, use the same module split once publishing metadata is added:
+For a published Maven setup, use the same module split:
 
 ```kotlin
 commonMain.dependencies {
-    implementation("io.github.mahmoud.ktorscope:ktorscope-core:<version>")
-    implementation("io.github.mahmoud.ktorscope:ktorscope-ktor:<version>")
-    implementation("io.github.mahmoud.ktorscope:ktorscope-compose:<version>")
-    implementation("io.github.mahmoud.ktorscope:ktorscope-persistence:<version>")
+    implementation("io.github.mahmoud947:ktorscope-core:<version>")
+    implementation("io.github.mahmoud947:ktorscope-ktor:<version>")
+    implementation("io.github.mahmoud947:ktorscope-compose:<version>")
+    implementation("io.github.mahmoud947:ktorscope-persistence:<version>")
 }
 ```
 
@@ -74,6 +74,20 @@ fun NetworkInspectorRoute(onClose: () -> Unit) {
 }
 ```
 
+To keep historical sessions across launches, add `ktorscope-persistence`, create a `KtorScopePersistence` on each platform with `ScopPersistenceFactory`, and pass its `historyPersistence` into the Ktor plugin:
+
+```kotlin
+install(KtorScope) {
+    historyPersistence {
+        enabled = true
+        maxRecords = 500
+        this.persistence = ktorScopePersistence.historyPersistence
+    }
+}
+```
+
+Then pass `persistHistory = true` and `onLoadFullBody = ktorScopePersistence.bodyFileStore::readBody` to `KtorScopeScreen`.
+
 ## What It Captures
 
 - Request method, URL, headers, and supported text/byte-array request bodies.
@@ -93,25 +107,21 @@ fun NetworkInspectorRoute(onClose: () -> Unit) {
 - [Development](docs/development.md)
 - [Brand Assets](docs/brand-assets.md)
 
-## Run the Sample
-
-Build the Android sample:
-
-```shell
-./gradlew :sample-compose-app:assembleDebug
-```
+## Build
 
 Build all library modules:
 
 ```shell
-./gradlew :ktorscope-core:build :ktorscope-ktor:build :ktorscope-compose:build
+./gradlew :ktorscope-core:build :ktorscope-ktor:build :ktorscope-compose:build :ktorscope-persistence:build
 ```
 
-Open `iosApp` in Xcode to run the iOS shell app, or use the `sample-compose-app` iOS target from your Kotlin Multiplatform IDE workflow.
+## Publishing
 
-## Current Status
+KtorScope uses the same Maven Central publishing setup as KPDF. Set `VERSION_NAME` in `gradle.properties`, configure the Maven Central and signing credentials expected by the Vanniktech Maven Publish plugin, then publish all library modules together:
 
-KtorScope is source-ready in this repository. Maven publishing configuration is not present yet, so external consumers need either local project/module dependencies or a future published artifact coordinate.
+```shell
+./gradlew publishToMavenCentral
+```
 
 ## License
 

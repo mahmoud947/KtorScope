@@ -6,8 +6,8 @@
 ktorscope-core/       Shared models, store, redaction, formatting, export helpers
 ktorscope-ktor/       Ktor Client plugin
 ktorscope-compose/    Compose Multiplatform inspector UI
-sample-compose-app/   Android/iOS sample app using the library modules
-composeApp/           Generated starter app module
+ktorscope-persistence/ Optional Room KMP history persistence and body file storage
+composeApp/           Android/iOS sample app using the library modules
 iosApp/               iOS app shell
 ```
 
@@ -16,13 +16,13 @@ iosApp/               iOS app shell
 Build the library modules:
 
 ```shell
-./gradlew :ktorscope-core:build :ktorscope-ktor:build :ktorscope-compose:build
+./gradlew :ktorscope-core:build :ktorscope-ktor:build :ktorscope-compose:build :ktorscope-persistence:build
 ```
 
 Build the sample Android app:
 
 ```shell
-./gradlew :sample-compose-app:assembleDebug
+./gradlew :composeApp:assembleDebug
 ```
 
 Run checks for a single module:
@@ -40,13 +40,12 @@ Run checks for a single module:
 
 ## Publishing Notes
 
-The repository does not currently include Maven publishing configuration. Before publishing:
+The repository publishes the four library modules with the same Maven Central flow used by KPDF:
 
-1. Add group and version metadata.
-2. Configure `maven-publish` for each library module.
-3. Add POM metadata, license, developers, SCM, and signing as needed.
-4. Publish `ktorscope-core`, `ktorscope-ktor`, and `ktorscope-compose` together.
-5. Update README dependency snippets with the released version.
+1. Set `VERSION_NAME` in `gradle.properties`.
+2. Configure Maven Central and signing credentials for the Vanniktech Maven Publish plugin.
+3. Publish `ktorscope-core`, `ktorscope-ktor`, `ktorscope-compose`, and `ktorscope-persistence` together.
+4. Update README dependency snippets with the released version.
 
 ## Documentation Checklist
 

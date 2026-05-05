@@ -21,13 +21,22 @@ commonMain.dependencies {
 }
 ```
 
+Add the persistence module only when you want Room-backed history and platform file storage for large bodies:
+
+```kotlin
+commonMain.dependencies {
+    implementation(projects.ktorscopePersistence)
+}
+```
+
 For external apps, publish the modules first, then consume the artifacts:
 
 ```kotlin
 commonMain.dependencies {
-    implementation("io.github.mahmoud.ktorscope:ktorscope-core:<version>")
-    implementation("io.github.mahmoud.ktorscope:ktorscope-ktor:<version>")
-    implementation("io.github.mahmoud.ktorscope:ktorscope-compose:<version>")
+    implementation("io.github.mahmoud947:ktorscope-core:<version>")
+    implementation("io.github.mahmoud947:ktorscope-ktor:<version>")
+    implementation("io.github.mahmoud947:ktorscope-compose:<version>")
+    implementation("io.github.mahmoud947:ktorscope-persistence:<version>")
 }
 ```
 
@@ -74,14 +83,33 @@ Use a custom store when you want isolated clients, tests, or multiple inspector 
 
 ## 4. Optional Historical Session Persistence
 
-By default, KtorScope is in-memory only. If you want historical transactions across launches, add `ktorscope-persistence` and pass an opt-in Room adapter:
+By default, KtorScope is in-memory only. If you want historical transactions across launches, add `ktorscope-persistence`, create `KtorScopePersistence` on each platform, and pass the history adapter into the plugin.
+
+Android:
 
 ```kotlin
-import io.github.mahmoud.ktorscope.persistence.createRoomKtorScopeHistoryPersistence
-import io.github.mahmoud.ktorscope.persistence.rememberKtorScopeHistoryPersistence
+import io.github.mahmoud.ktorscope.persistence.ScopPersistenceFactory
 
-val ktorScopePersistence = rememberKtorScopeHistoryPersistence()
+val ktorScopePersistence = ScopPersistenceFactory(applicationContext).create(
+    databaseName = "network_inspector.db",
+    bodyDirectoryName = "network_inspector_bodies",
+)
+```
 
+iOS:
+
+```kotlin
+import io.github.mahmoud.ktorscope.persistence.ScopPersistenceFactory
+
+val ktorScopePersistence = ScopPersistenceFactory().create(
+    databaseName = "network_inspector.db",
+    bodyDirectoryName = "network_inspector_bodies",
+)
+```
+
+Common Ktor setup:
+
+```kotlin
 val client = HttpClient {
     install(KtorScope) {
         enabled = true
@@ -97,7 +125,7 @@ val client = HttpClient {
 }
 ```
 
-Room dependencies stay out of `ktorscope-core`, `ktorscope-ktor`, and `ktorscope-compose`.
+Room dependencies stay out of `ktorscope-core`, `ktorscope-ktor`, and `ktorscope-compose`. `ScopPersistenceFactory` returns both the history adapter and the body file store needed by the UI.
 
 ## 5. Render the Inspector
 
@@ -105,10 +133,12 @@ Room dependencies stay out of `ktorscope-core`, `ktorscope-ktor`, and `ktorscope
 import androidx.compose.runtime.Composable
 import io.github.mahmoud.ktorscope.compose.KtorScopeScreen
 import io.github.mahmoud.ktorscope.core.KtorScopeStore
+import io.github.mahmoud.ktorscope.persistence.KtorScopePersistence
 
 @Composable
 fun DebugNetworkScreen(
     store: KtorScopeStore,
+    ktorScopePersistence: KtorScopePersistence,
     onClose: () -> Unit,
 ) {
     KtorScopeScreen(

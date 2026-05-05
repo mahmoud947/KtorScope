@@ -26,7 +26,9 @@ install(KtorScope) {
 | --- | --- | --- |
 | `enabled` | `true` | Turns capture on or off without removing the plugin. |
 | `captureBodies` | `true` | Captures supported request and response body previews. |
-| `maxBodySize` | `250_000` | Maximum captured body preview length. Longer bodies are truncated. |
+| `maxBodySize` | `250_000` | Legacy body preview size shortcut. Prefer `historyPersistence { maxBodyPreviewSize = ... }` for persisted history. |
+| `maxBodyPreviewSize` | `250_000` | Maximum captured body preview length. Longer bodies are truncated unless persistence keeps full bodies for file storage. |
+| `largeBodyFileThreshold` | `250_000` | Size threshold used by persistence when deciding whether full body content should move to platform file storage. |
 | `historyPersistenceConfig` | `KtorScopeHistoryPersistenceConfig()` | Optional persistence config. Room lives in `ktorscope-persistence`, not core. |
 | `historyPersistence { ... }` | disabled | Builder for enabling persistence, max records, body preview size, large-body threshold, and adapter. |
 | `redactHeaders` | `Authorization`, `Cookie`, `Set-Cookie`, `X-Api-Key`, `Api-Key`, `access_token`, `refresh_token` | Case-insensitive header names to redact before storage. |
@@ -76,16 +78,33 @@ val client = HttpClient {
 }
 ```
 
-Room persistence is opt-in from the separate persistence module:
+Room persistence is opt-in from the separate persistence module. Create a `KtorScopePersistence` at the platform edge, then pass it into your common code.
+
+Android:
 
 ```kotlin
-import io.github.mahmoud.ktorscope.persistence.createRoomKtorScopeHistoryPersistence
+import io.github.mahmoud.ktorscope.persistence.ScopPersistenceFactory
 
-val persistence = createRoomKtorScopeHistoryPersistence(
-    context = context,
+val ktorScopePersistence = ScopPersistenceFactory(applicationContext).create(
     databaseName = "network_inspector.db",
+    bodyDirectoryName = "network_inspector_bodies",
 )
+```
 
+iOS:
+
+```kotlin
+import io.github.mahmoud.ktorscope.persistence.ScopPersistenceFactory
+
+val ktorScopePersistence = ScopPersistenceFactory().create(
+    databaseName = "network_inspector.db",
+    bodyDirectoryName = "network_inspector_bodies",
+)
+```
+
+Common Ktor setup:
+
+```kotlin
 val client = HttpClient {
     install(KtorScope) {
         enabled = true
@@ -95,7 +114,7 @@ val client = HttpClient {
             maxRecords = 500
             maxBodyPreviewSize = 250_000
             largeBodyFileThreshold = 250_000
-            this.persistence = persistence
+            this.persistence = ktorScopePersistence.historyPersistence
         }
     }
 }
@@ -103,22 +122,9 @@ val client = HttpClient {
 
 Room stores searchable metadata and body previews. The persistence module can store larger body content in platform files and expose the file path on the domain model for the details screen.
 
-In Compose apps, use the built-in helper so you do not need app-level `expect`/`actual` setup:
+Common Compose setup:
 
 ```kotlin
-import io.github.mahmoud.ktorscope.persistence.rememberKtorScopeHistoryPersistence
-
-val ktorScopePersistence = rememberKtorScopeHistoryPersistence()
-
-val client = HttpClient {
-    install(KtorScope) {
-        historyPersistence {
-            enabled = true
-            this.persistence = ktorScopePersistence.historyPersistence
-        }
-    }
-}
-
 KtorScopeScreen(
     persistHistory = true,
     onLoadFullBody = ktorScopePersistence.bodyFileStore::readBody,
