@@ -8,6 +8,8 @@ KtorScope is a Kotlin Multiplatform network inspector for Ktor Client. It captur
 
 The project currently targets Android and iOS.
 
+Current version: `1.0.0`
+
 ## Modules
 
 | Module | Purpose |
@@ -19,7 +21,42 @@ The project currently targets Android and iOS.
 
 ## Quick Start
 
-Add the modules you need. Inside this repository, use project dependencies:
+For a published Maven setup, use the same module split:
+
+```kotlin
+commonMain.dependencies {
+    implementation("io.github.mahmoud947:ktorscope-core:1.0.0")
+    implementation("io.github.mahmoud947:ktorscope-ktor:1.0.0")
+    implementation("io.github.mahmoud947:ktorscope-compose:1.0.0")
+    implementation("io.github.mahmoud947:ktorscope-persistence:1.0.0")
+}
+```
+
+If you use a Gradle version catalog, add the modules to `gradle/libs.versions.toml`:
+
+```toml
+[versions]
+ktorscope = "1.0.0"
+
+[libraries]
+ktorscope-core = { module = "io.github.mahmoud947:ktorscope-core", version.ref = "ktorscope" }
+ktorscope-ktor = { module = "io.github.mahmoud947:ktorscope-ktor", version.ref = "ktorscope" }
+ktorscope-compose = { module = "io.github.mahmoud947:ktorscope-compose", version.ref = "ktorscope" }
+ktorscope-persistence = { module = "io.github.mahmoud947:ktorscope-persistence", version.ref = "ktorscope" }
+```
+
+Then use the aliases in your dependencies:
+
+```kotlin
+commonMain.dependencies {
+    implementation(libs.ktorscope.core)
+    implementation(libs.ktorscope.ktor)
+    implementation(libs.ktorscope.compose)
+    implementation(libs.ktorscope.persistence)
+}
+```
+
+Inside this repository, use project dependencies:
 
 ```kotlin
 commonMain.dependencies {
@@ -27,17 +64,6 @@ commonMain.dependencies {
     implementation(projects.ktorscopeKtor)
     implementation(projects.ktorscopeCompose)
     implementation(projects.ktorscopePersistence) // optional Room history
-}
-```
-
-For a published Maven setup, use the same module split:
-
-```kotlin
-commonMain.dependencies {
-    implementation("io.github.mahmoud947:ktorscope-core:<version>")
-    implementation("io.github.mahmoud947:ktorscope-ktor:<version>")
-    implementation("io.github.mahmoud947:ktorscope-compose:<version>")
-    implementation("io.github.mahmoud947:ktorscope-persistence:<version>")
 }
 ```
 

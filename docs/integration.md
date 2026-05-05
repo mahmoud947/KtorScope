@@ -2,7 +2,44 @@
 
 This guide shows the smallest useful KtorScope setup for a Kotlin Multiplatform app.
 
+Current version: `1.0.0`
+
 ## 1. Add Dependencies
+
+For external apps, consume the published artifacts:
+
+```kotlin
+commonMain.dependencies {
+    implementation("io.github.mahmoud947:ktorscope-core:1.0.0")
+    implementation("io.github.mahmoud947:ktorscope-ktor:1.0.0")
+    implementation("io.github.mahmoud947:ktorscope-compose:1.0.0")
+    implementation("io.github.mahmoud947:ktorscope-persistence:1.0.0")
+}
+```
+
+If you use a Gradle version catalog, add the modules to `gradle/libs.versions.toml`:
+
+```toml
+[versions]
+ktorscope = "1.0.0"
+
+[libraries]
+ktorscope-core = { module = "io.github.mahmoud947:ktorscope-core", version.ref = "ktorscope" }
+ktorscope-ktor = { module = "io.github.mahmoud947:ktorscope-ktor", version.ref = "ktorscope" }
+ktorscope-compose = { module = "io.github.mahmoud947:ktorscope-compose", version.ref = "ktorscope" }
+ktorscope-persistence = { module = "io.github.mahmoud947:ktorscope-persistence", version.ref = "ktorscope" }
+```
+
+Then use the aliases in your dependencies:
+
+```kotlin
+commonMain.dependencies {
+    implementation(libs.ktorscope.core)
+    implementation(libs.ktorscope.ktor)
+    implementation(libs.ktorscope.compose)
+    implementation(libs.ktorscope.persistence)
+}
+```
 
 Inside this repository:
 
@@ -26,17 +63,6 @@ Add the persistence module only when you want Room-backed history and platform f
 ```kotlin
 commonMain.dependencies {
     implementation(projects.ktorscopePersistence)
-}
-```
-
-For external apps, publish the modules first, then consume the artifacts:
-
-```kotlin
-commonMain.dependencies {
-    implementation("io.github.mahmoud947:ktorscope-core:<version>")
-    implementation("io.github.mahmoud947:ktorscope-ktor:<version>")
-    implementation("io.github.mahmoud947:ktorscope-compose:<version>")
-    implementation("io.github.mahmoud947:ktorscope-persistence:<version>")
 }
 ```
 

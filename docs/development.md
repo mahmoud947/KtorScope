@@ -42,7 +42,7 @@ Run checks for a single module:
 
 The repository publishes the four library modules with the same Maven Central flow used by KPDF:
 
-1. Set `VERSION_NAME` in `gradle.properties`.
+1. Set `VERSION_NAME` in `gradle.properties` to the release version.
 2. Configure Maven Central and signing credentials for the Vanniktech Maven Publish plugin.
 3. Publish `ktorscope-core`, `ktorscope-ktor`, `ktorscope-compose`, and `ktorscope-persistence` together.
 4. Update README dependency snippets with the released version.
