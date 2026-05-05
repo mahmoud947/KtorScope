@@ -28,7 +28,7 @@ commonMain.dependencies {
     implementation("io.github.mahmoud947:ktorscope-core:1.0.0")
     implementation("io.github.mahmoud947:ktorscope-ktor:1.0.0")
     implementation("io.github.mahmoud947:ktorscope-compose:1.0.0")
-    implementation("io.github.mahmoud947:ktorscope-persistence:1.0.0")
+    implementation("io.github.mahmoud947:ktorscope-persistence:1.0.0") // optional Room history
 }
 ```
 
@@ -52,7 +52,7 @@ commonMain.dependencies {
     implementation(libs.ktorscope.core)
     implementation(libs.ktorscope.ktor)
     implementation(libs.ktorscope.compose)
-    implementation(libs.ktorscope.persistence)
+    implementation(libs.ktorscope.persistence) // optional Room history
 }
 ```
 
