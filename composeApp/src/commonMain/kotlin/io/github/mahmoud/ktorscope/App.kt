@@ -67,6 +67,9 @@ fun App(
 ) {
     MaterialTheme {
         var showInspector by remember { mutableStateOf(false) }
+        val lightMode = SampleLightMode
+        val sampleColors = remember(lightMode) { sampleColors(lightMode) }
+        val inspectorThemeMode = if (lightMode) KtorScopeThemeMode.Light else KtorScopeThemeMode.Dark
         val scope = rememberCoroutineScope()
         val networkPersistence = remember { ktorScopePersistence }
         val client = rememberSampleClient(networkPersistence.historyPersistence)
@@ -75,20 +78,20 @@ fun App(
         if (showInspector) {
             KtorScopeScreen(
                 onBackClicked = { showInspector = false },
-                themeMode = KtorScopeThemeMode.Dark,
+                themeMode = inspectorThemeMode,
                 persistHistory = true,
                 onLoadFullBody = networkPersistence.bodyFileStore::readBody,
             )
         } else {
-            Surface(Modifier.fillMaxSize(), color = Color(0xFF07111F)) {
+            Surface(Modifier.fillMaxSize(), color = sampleColors.backgroundStart) {
                 Column(
                     modifier = Modifier
                         .fillMaxSize()
                         .background(
                             Brush.verticalGradient(
-                                0f to Color(0xFF07111F),
-                                0.55f to Color(0xFF101827),
-                                1f to Color(0xFF070A12),
+                                0f to sampleColors.backgroundStart,
+                                0.55f to sampleColors.backgroundMid,
+                                1f to sampleColors.backgroundEnd,
                             ),
                         )
                         .verticalScroll(rememberScrollState()),
@@ -96,9 +99,11 @@ fun App(
                 ) {
                     SampleHero(
                         status = status,
+                        colors = sampleColors,
                         onOpenInspector = { showInspector = true },
                     )
                     RequestButtons(
+                        colors = sampleColors,
                         onSuccess = {
                             scope.launch {
                                 status = runSampleCall {
@@ -268,7 +273,7 @@ fun App(
                             }
                         },
                     )
-                    CapturePreview(status = status)
+                    CapturePreview(status = status, colors = sampleColors)
                 }
             }
         }
@@ -308,6 +313,7 @@ private fun rememberSampleClient(
 
 @Composable
 private fun RequestButtons(
+    colors: SampleColors,
     onSuccess: () -> Unit,
     onFailure: () -> Unit,
     onPost: () -> Unit,
@@ -321,6 +327,7 @@ private fun RequestButtons(
         SectionHeader(
             title = "Request Lab",
             subtitle = "Generate traffic, failures, payloads, and GraphQL traces.",
+            colors = colors,
         )
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             RequestAction(
@@ -328,6 +335,7 @@ private fun RequestButtons(
                 title = "Success",
                 subtitle = "200 response",
                 accent = Color(0xFF5EEAD4),
+                colors = colors,
                 onClick = onSuccess,
                 modifier = Modifier.weight(1f),
             )
@@ -336,6 +344,7 @@ private fun RequestButtons(
                 title = "Failure",
                 subtitle = "DNS error",
                 accent = Color(0xFFFF6B6B),
+                colors = colors,
                 onClick = onFailure,
                 modifier = Modifier.weight(1f),
             )
@@ -346,6 +355,7 @@ private fun RequestButtons(
                 title = "Body",
                 subtitle = "JSON + secrets",
                 accent = Color(0xFFFFD166),
+                colors = colors,
                 onClick = onPost,
                 modifier = Modifier.weight(1f),
             )
@@ -354,6 +364,7 @@ private fun RequestButtons(
                 title = "Delayed",
                 subtitle = "2s timing",
                 accent = Color(0xFF90CAF9),
+                colors = colors,
                 onClick = onDelayed,
                 modifier = Modifier.weight(1f),
             )
@@ -364,6 +375,7 @@ private fun RequestButtons(
                 title = "PUT",
                 subtitle = "Update",
                 accent = Color(0xFFB8F7A3),
+                colors = colors,
                 compact = true,
                 onClick = onPut,
                 modifier = Modifier.weight(1f),
@@ -373,6 +385,7 @@ private fun RequestButtons(
                 title = "PATCH",
                 subtitle = "Partial",
                 accent = Color(0xFFD8B4FE),
+                colors = colors,
                 compact = true,
                 onClick = onPatch,
                 modifier = Modifier.weight(1f),
@@ -382,6 +395,7 @@ private fun RequestButtons(
                 title = "DELETE",
                 subtitle = "Remove",
                 accent = Color(0xFFFFA3A3),
+                colors = colors,
                 compact = true,
                 onClick = onDelete,
                 modifier = Modifier.weight(1f),
@@ -392,6 +406,7 @@ private fun RequestButtons(
             title = "GraphQL ViewerProfile",
             subtitle = "Operation name, query, and variables preview",
             accent = Color(0xFFFF8BD1),
+            colors = colors,
             onClick = onGraphQl,
             modifier = Modifier.fillMaxWidth(),
         )
@@ -401,6 +416,7 @@ private fun RequestButtons(
 @Composable
 private fun SampleHero(
     status: String,
+    colors: SampleColors,
     onOpenInspector: () -> Unit,
 ) {
     Box(
@@ -410,13 +426,13 @@ private fun SampleHero(
             .background(
                 Brush.linearGradient(
                     listOf(
-                        Color(0xFF15233B),
-                        Color(0xFF0B5C75),
-                        Color(0xFF15131F),
+                        colors.heroStart,
+                        colors.heroMid,
+                        colors.heroEnd,
                     ),
                 ),
             )
-            .border(1.dp, Color.White.copy(alpha = 0.12f), RoundedCornerShape(8.dp))
+            .border(1.dp, colors.border, RoundedCornerShape(8.dp))
             .padding(18.dp),
     ) {
         Column(
@@ -433,12 +449,12 @@ private fun SampleHero(
                     label = {
                         Text(
                             "Ktor Client Inspector",
-                            color = Color.White.copy(alpha = 0.5f)
+                            color = colors.secondaryText
                         )
                     },
-                    border = BorderStroke(1.dp, Color.White.copy(alpha = 0.22f)),
+                    border = BorderStroke(1.dp, colors.border),
                 )
-                StatusDot(active = status.startsWith("Ready").not())
+                StatusDot(active = status.startsWith("Ready").not(), colors = colors)
             }
             Column(
                 verticalArrangement = Arrangement.spacedBy(6.dp),
@@ -446,7 +462,7 @@ private fun SampleHero(
             ) {
                 Text(
                     text = "KtorScope",
-                    color = Color.White,
+                    color = colors.primaryText,
                     style = MaterialTheme.typography.displaySmall,
                     fontWeight = FontWeight.Black,
                 )
@@ -463,16 +479,16 @@ private fun SampleHero(
                 Button(
                     onClick = onOpenInspector,
                     colors = ButtonDefaults.buttonColors(
-                        containerColor = Color(0xFF5EEAD4),
-                        contentColor = Color(0xFF05201D),
+                        containerColor = colors.ctaContainer,
+                        contentColor = colors.ctaContent,
                     ),
                 ) {
                     Text("Open Inspector", fontWeight = FontWeight.Bold)
                 }
                 OutlinedButton(
                     onClick = onOpenInspector,
-                    border = BorderStroke(1.dp, Color.White.copy(alpha = 0.32f)),
-                    colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White),
+                    border = BorderStroke(1.dp, colors.borderStrong),
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = colors.primaryText),
                 ) {
                     Text("View Logs")
                 }
@@ -487,6 +503,7 @@ private fun RequestAction(
     title: String,
     subtitle: String,
     accent: Color,
+    colors: SampleColors,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     compact: Boolean = false,
@@ -495,8 +512,8 @@ private fun RequestAction(
         onClick = onClick,
         modifier = modifier.height(if (compact) 104.dp else 118.dp),
         shape = RoundedCornerShape(8.dp),
-        colors = CardDefaults.cardColors(containerColor = Color(0xFF111827)),
-        border = BorderStroke(1.dp, Color.White.copy(alpha = 0.08f)),
+        colors = CardDefaults.cardColors(containerColor = colors.card),
+        border = BorderStroke(1.dp, colors.border),
     ) {
         Column(
             modifier = Modifier
@@ -515,7 +532,7 @@ private fun RequestAction(
             Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
                 Text(
                     text = title,
-                    color = Color.White,
+                    color = colors.primaryText,
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold,
                     maxLines = 1,
@@ -523,7 +540,7 @@ private fun RequestAction(
                 )
                 Text(
                     text = subtitle,
-                    color = Color(0xFF9CA3AF),
+                    color = colors.secondaryText,
                     style = MaterialTheme.typography.bodySmall,
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
@@ -534,36 +551,37 @@ private fun RequestAction(
 }
 
 @Composable
-private fun CapturePreview(status: String) {
+private fun CapturePreview(status: String, colors: SampleColors) {
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
         SectionHeader(
             title = "Live Capture",
             subtitle = "A video-friendly console for the latest sample action.",
+            colors = colors,
         )
         Card(
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(8.dp),
-            colors = CardDefaults.cardColors(containerColor = Color(0xFF0B1220)),
-            border = BorderStroke(1.dp, Color.White.copy(alpha = 0.1f)),
+            colors = CardDefaults.cardColors(containerColor = colors.console),
+            border = BorderStroke(1.dp, colors.border),
         ) {
             Column(
                 modifier = Modifier.padding(16.dp),
                 verticalArrangement = Arrangement.spacedBy(14.dp),
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    StatusDot(active = status.startsWith("Ready").not())
+                    StatusDot(active = status.startsWith("Ready").not(), colors = colors)
                     Spacer(Modifier.width(10.dp))
                     Text(
                         text = status,
-                        color = Color.White,
+                        color = colors.primaryText,
                         style = MaterialTheme.typography.bodyMedium,
                         fontWeight = FontWeight.SemiBold,
                     )
                 }
                 Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    MetricTile("Headers", "Redacted", Color(0xFF5EEAD4), Modifier.weight(1f))
-                    MetricTile("Bodies", "Captured", Color(0xFFFFD166), Modifier.weight(1f))
-                    MetricTile("History", "Persisted", Color(0xFF90CAF9), Modifier.weight(1f))
+                    MetricTile("Headers", "Redacted", Color(0xFF5EEAD4), colors, Modifier.weight(1f))
+                    MetricTile("Bodies", "Captured", Color(0xFFFFD166), colors, Modifier.weight(1f))
+                    MetricTile("History", "Persisted", Color(0xFF90CAF9), colors, Modifier.weight(1f))
                 }
             }
         }
@@ -575,13 +593,14 @@ private fun MetricTile(
     label: String,
     value: String,
     accent: Color,
+    colors: SampleColors,
     modifier: Modifier = Modifier,
 ) {
     Column(
         modifier = modifier
             .clip(RoundedCornerShape(8.dp))
-            .background(Color.White.copy(alpha = 0.05f))
-            .border(1.dp, Color.White.copy(alpha = 0.06f), RoundedCornerShape(8.dp))
+            .background(colors.tile)
+            .border(1.dp, colors.border, RoundedCornerShape(8.dp))
             .aspectRatio(1.1f)
             .padding(10.dp),
         verticalArrangement = Arrangement.SpaceBetween,
@@ -595,7 +614,7 @@ private fun MetricTile(
         Column {
             Text(
                 text = value,
-                color = Color.White,
+                color = colors.primaryText,
                 style = MaterialTheme.typography.labelLarge,
                 fontWeight = FontWeight.Bold,
                 maxLines = 1,
@@ -603,7 +622,7 @@ private fun MetricTile(
             )
             Text(
                 text = label,
-                color = Color(0xFF9CA3AF),
+                color = colors.secondaryText,
                 style = MaterialTheme.typography.labelSmall,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
@@ -613,24 +632,24 @@ private fun MetricTile(
 }
 
 @Composable
-private fun SectionHeader(title: String, subtitle: String) {
+private fun SectionHeader(title: String, subtitle: String, colors: SampleColors) {
     Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
         Text(
             text = title,
-            color = Color.White,
+            color = colors.primaryText,
             style = MaterialTheme.typography.titleLarge,
             fontWeight = FontWeight.Bold,
         )
         Text(
             text = subtitle,
-            color = Color(0xFFA8B3C7),
+            color = colors.secondaryText,
             style = MaterialTheme.typography.bodySmall,
         )
     }
 }
 
 @Composable
-private fun StatusDot(active: Boolean) {
+private fun StatusDot(active: Boolean, colors: SampleColors) {
     Row(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(6.dp),
@@ -643,9 +662,69 @@ private fun StatusDot(active: Boolean) {
         )
         Text(
             text = if (active) "Captured" else "Ready",
-            color = Color.White.copy(alpha = 0.82f),
+            color = colors.primaryText.copy(alpha = 0.82f),
             style = MaterialTheme.typography.labelMedium,
             textAlign = TextAlign.End,
+        )
+    }
+}
+
+private data class SampleColors(
+    val backgroundStart: Color,
+    val backgroundMid: Color,
+    val backgroundEnd: Color,
+    val heroStart: Color,
+    val heroMid: Color,
+    val heroEnd: Color,
+    val card: Color,
+    val console: Color,
+    val tile: Color,
+    val border: Color,
+    val borderStrong: Color,
+    val primaryText: Color,
+    val secondaryText: Color,
+    val ctaContainer: Color,
+    val ctaContent: Color,
+)
+
+private const val SampleLightMode = true
+
+private fun sampleColors(lightMode: Boolean): SampleColors {
+    return if (lightMode) {
+        SampleColors(
+            backgroundStart = Color(0xFFF8FAFC),
+            backgroundMid = Color(0xFFEAF3F7),
+            backgroundEnd = Color(0xFFF5F7FB),
+            heroStart = Color(0xFFE9F8F5),
+            heroMid = Color(0xFFD7ECFF),
+            heroEnd = Color(0xFFFFFFFF),
+            card = Color(0xFFFFFFFF),
+            console = Color(0xFFFFFFFF),
+            tile = Color(0xFFF1F5F9),
+            border = Color(0x1F0F172A),
+            borderStrong = Color(0x660F172A),
+            primaryText = Color(0xFF0F172A),
+            secondaryText = Color(0xFF516070),
+            ctaContainer = Color(0xFF0F766E),
+            ctaContent = Color.White,
+        )
+    } else {
+        SampleColors(
+            backgroundStart = Color(0xFF07111F),
+            backgroundMid = Color(0xFF101827),
+            backgroundEnd = Color(0xFF070A12),
+            heroStart = Color(0xFF15233B),
+            heroMid = Color(0xFF0B5C75),
+            heroEnd = Color(0xFF15131F),
+            card = Color(0xFF111827),
+            console = Color(0xFF0B1220),
+            tile = Color.White.copy(alpha = 0.05f),
+            border = Color.White.copy(alpha = 0.1f),
+            borderStrong = Color.White.copy(alpha = 0.32f),
+            primaryText = Color.White,
+            secondaryText = Color(0xFFA8B3C7),
+            ctaContainer = Color(0xFF5EEAD4),
+            ctaContent = Color(0xFF05201D),
         )
     }
 }
