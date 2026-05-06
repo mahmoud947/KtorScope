@@ -13,8 +13,11 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -29,9 +32,11 @@ import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -40,9 +45,15 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import io.github.mahmoud.ktorscope.compose.KtorScopeTheme
 import io.github.mahmoud.ktorscope.compose.KtorScopeThemeMode
@@ -67,6 +78,15 @@ internal fun DetailsPanel(
         return
     }
     var selectedTab by remember(transaction.id) { mutableIntStateOf(0) }
+    var fullBodyPreview by remember(transaction.id) { mutableStateOf<BodyPreviewTarget?>(null) }
+    fullBodyPreview?.let { target ->
+        FullBodyPreviewScreen(
+            target = target,
+            onBack = { fullBodyPreview = null },
+            modifier = modifier,
+        )
+        return
+    }
     Column(
         modifier.background(MaterialTheme.colorScheme.background).padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp),
@@ -89,12 +109,14 @@ internal fun DetailsPanel(
                     GraphQlSection(transaction, onCopy)
                     HeadersSection(transaction.request.headers, onCopy)
                     BodySection(
+                        title = "Request body",
                         body = transaction.request.body,
                         truncated = transaction.request.bodyTruncated,
                         filePath = transaction.request.bodyFilePath,
                         bodySizeBytes = transaction.request.bodySizeBytes,
                         onCopy = onCopy,
                         onLoadFullBody = onLoadFullBody,
+                        onShowMore = { fullBodyPreview = it },
                     )
                 }
                 1 -> {
@@ -107,12 +129,14 @@ internal fun DetailsPanel(
                         }
                         HeadersSection(response.headers, onCopy)
                         BodySection(
+                            title = "Response body",
                             body = response.body,
                             truncated = response.bodyTruncated,
                             filePath = response.bodyFilePath,
                             bodySizeBytes = response.bodySizeBytes,
                             onCopy = onCopy,
                             onLoadFullBody = onLoadFullBody,
+                            onShowMore = { fullBodyPreview = it },
                         )
                     }
                 }
@@ -247,19 +271,30 @@ private fun HeadersSection(headers: Map<String, List<String>>, onCopy: (String) 
 
 @Composable
 private fun BodySection(
+    title: String,
     body: String?,
     truncated: Boolean,
     filePath: String?,
     bodySizeBytes: Long?,
     onCopy: (String) -> Unit,
     onLoadFullBody: suspend (String) -> String?,
+    onShowMore: (BodyPreviewTarget) -> Unit,
 ) {
     val scope = rememberCoroutineScope()
     var loadedBody by remember(filePath) { mutableStateOf<String?>(null) }
     var loading by remember(filePath) { mutableStateOf(false) }
     val visibleBody = loadedBody ?: body
-    val previewDisplay = remember(body) { body?.prettyJsonOrSelf() }
-    val loadedDisplay = remember(loadedBody) { loadedBody?.prettyJsonOrSelf() }
+    val formatter = remember { FastJsonPreviewFormatter(maxLines = InlineBodyPreviewLines) }
+    val previewLines = remember(visibleBody) { mutableStateListOf<JsonLine>() }
+    var previewState by remember(visibleBody) {
+        mutableStateOf(
+            JsonPreviewState(
+                isLoading = visibleBody != null,
+                lines = previewLines,
+            ),
+        )
+    }
+    var hasMoreLines by remember(visibleBody) { mutableStateOf(false) }
     val bodyDescription = remember(filePath, body, bodySizeBytes) {
         when {
             filePath != null -> "Stored as preview + file${bodySizeBytes?.let { " ($it B)" }.orEmpty()}"
@@ -267,14 +302,34 @@ private fun BodySection(
             else -> "No stored body"
         }
     }
-    val bodyText = remember(visibleBody, loadedBody, truncated, previewDisplay, loadedDisplay) {
-        when {
-            visibleBody == null -> "No body captured"
-            loadedBody != null -> loadedDisplay.orEmpty()
-            truncated -> "${previewDisplay.orEmpty()}\n\n[truncated]"
-            else -> previewDisplay.orEmpty()
+
+    LaunchedEffect(visibleBody, truncated, loadedBody) {
+        previewLines.clear()
+        hasMoreLines = false
+        previewState = JsonPreviewState(isLoading = visibleBody != null, lines = previewLines)
+        val source = visibleBody
+        if (source == null) {
+            previewLines.add(JsonLine(0, listOf(JsonToken.Plain("No body captured"))))
+            previewState = JsonPreviewState(isLoading = false, lines = previewLines)
+            return@LaunchedEffect
+        }
+        formatter.format(source).collect { chunk ->
+            previewLines.addAll(chunk.lines)
+            if (chunk.isLimited) hasMoreLines = true
+            val truncationLine = if (chunk.isComplete && truncated && loadedBody == null) {
+                JsonLine(previewLines.size, listOf(JsonToken.Plain("[truncated]")))
+            } else {
+                null
+            }
+            truncationLine?.let(previewLines::add)
+            previewState = JsonPreviewState(
+                isLoading = !chunk.isComplete,
+                lines = previewLines,
+                error = chunk.error,
+            )
         }
     }
+
     SectionCard("Body preview", action = {
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
             if (filePath != null) {
@@ -299,13 +354,146 @@ private fun BodySection(
             style = MaterialTheme.typography.labelSmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
-        Text(
-            text = bodyText,
-            style = MaterialTheme.typography.bodySmall,
-            fontFamily = FontFamily.Monospace,
-            color = MaterialTheme.colorScheme.onSurface,
+        JsonBodyPreview(state = previewState)
+        if (visibleBody != null && visibleBody.isNotEmpty() && (hasMoreLines || truncated)) {
+            TextButton(
+                onClick = {
+                    onShowMore(
+                        BodyPreviewTarget(
+                            title = title,
+                            body = visibleBody,
+                            truncated = truncated && loadedBody == null,
+                        ),
+                    )
+                },
+            ) {
+                Text("Show more")
+            }
+        }
+    }
+}
+
+@Composable
+private fun FullBodyPreviewScreen(
+    target: BodyPreviewTarget,
+    onBack: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val formatter = remember { FastJsonPreviewFormatter() }
+    val lines = remember(target.body) { mutableStateListOf<JsonLine>() }
+    var state by remember(target.body) {
+        mutableStateOf(JsonPreviewState(isLoading = true, lines = lines))
+    }
+
+    LaunchedEffect(target) {
+        lines.clear()
+        state = JsonPreviewState(isLoading = true, lines = lines)
+        formatter.format(target.body).collect { chunk ->
+            lines.addAll(chunk.lines)
+            val truncationLine = if (chunk.isComplete && target.truncated) {
+                JsonLine(lines.size, listOf(JsonToken.Plain("[truncated]")))
+            } else {
+                null
+            }
+            truncationLine?.let(lines::add)
+            state = JsonPreviewState(
+                isLoading = !chunk.isComplete,
+                lines = lines,
+                error = chunk.error,
+            )
+        }
+    }
+
+    Column(
+        modifier.background(MaterialTheme.colorScheme.background).padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            TextButton(onClick = onBack) { Text("Back") }
+            Text(target.title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+        }
+        JsonBodyPreview(
+            state = state,
+            modifier = Modifier.weight(1f),
+            maxHeight = null,
         )
     }
+}
+
+@Composable
+private fun JsonBodyPreview(
+    state: JsonPreviewState,
+    modifier: Modifier = Modifier,
+    maxHeight: Dp? = 420.dp,
+) {
+    val horizontalScrollState = rememberScrollState()
+    val colors = JsonTokenColors(
+        key = Color(0xFF38BDF8),
+        string = Color(0xFF22C55E),
+        number = Color(0xFFF59E0B),
+        literal = Color(0xFFA78BFA),
+        punctuation = MaterialTheme.colorScheme.onSurfaceVariant,
+        plain = MaterialTheme.colorScheme.onSurface,
+    )
+    Column(
+        modifier = modifier
+            .fillMaxWidth()
+            .then(if (maxHeight != null) Modifier.heightIn(max = maxHeight) else Modifier)
+            .background(
+                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f),
+                shape = RoundedCornerShape(10.dp),
+            )
+            .padding(10.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        if (state.isLoading && state.lines.isEmpty()) {
+            Text(
+                text = "Formatting body...",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        LazyColumn(
+            modifier = Modifier
+                .fillMaxWidth()
+                .weight(1f, fill = false)
+                .horizontalScroll(horizontalScrollState),
+        ) {
+            items(state.lines, key = { it.index }) { line ->
+                JsonLineText(line = line, colors = colors)
+            }
+        }
+        state.error?.let { error ->
+            Text(
+                text = error,
+                style = MaterialTheme.typography.labelSmall,
+                color = ErrorColor,
+            )
+        }
+        if (state.isLoading && state.lines.isNotEmpty()) {
+            Text(
+                text = "Formatting...",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+    }
+}
+
+@Composable
+private fun JsonLineText(
+    line: JsonLine,
+    colors: JsonTokenColors,
+) {
+    val text = remember(line, colors) { line.toAnnotatedString(colors) }
+    Text(
+        text = text,
+        style = MaterialTheme.typography.bodySmall,
+        fontFamily = FontFamily.Monospace,
+        softWrap = false,
+        overflow = TextOverflow.Clip,
+        color = colors.plain,
+    )
 }
 
 @Composable
@@ -333,6 +521,50 @@ private fun SectionCard(
 private fun EmptySection(text: String) {
     SectionCard(text) {
         Text("Nothing to show here.", color = MaterialTheme.colorScheme.onSurfaceVariant)
+    }
+}
+
+private const val InlineBodyPreviewLines = 5
+
+private data class BodyPreviewTarget(
+    val title: String,
+    val body: String,
+    val truncated: Boolean,
+)
+
+private data class JsonTokenColors(
+    val key: Color,
+    val string: Color,
+    val number: Color,
+    val literal: Color,
+    val punctuation: Color,
+    val plain: Color,
+)
+
+private fun JsonLine.toAnnotatedString(colors: JsonTokenColors): AnnotatedString = buildAnnotatedString {
+    tokens.forEach { token ->
+        val color = when (token) {
+            is JsonToken.Key -> colors.key
+            is JsonToken.StringValue -> colors.string
+            is JsonToken.NumberValue -> colors.number
+            is JsonToken.BooleanValue -> colors.literal
+            JsonToken.NullValue -> colors.literal
+            is JsonToken.Symbol -> colors.punctuation
+            is JsonToken.Plain -> colors.plain
+        }
+        withStyle(SpanStyle(color = color)) {
+            append(
+                when (token) {
+                    is JsonToken.Key -> token.text
+                    is JsonToken.StringValue -> token.text
+                    is JsonToken.NumberValue -> token.text
+                    is JsonToken.BooleanValue -> token.text
+                    JsonToken.NullValue -> "null"
+                    is JsonToken.Symbol -> token.text
+                    is JsonToken.Plain -> token.text
+                },
+            )
+        }
     }
 }
 
