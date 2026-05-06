@@ -1,6 +1,4 @@
-/**
- * Created by Mahmoud kamal El-Din on 02/05/2026
- */
+
 package io.github.mahmoud.ktorscope.compose.components
 
 import kotlinx.coroutines.Dispatchers
@@ -10,6 +8,9 @@ import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.isActive
 
+/**
+ * Created by Mahmoud kamal El-Din on 06/05/2026
+ */
 internal data class JsonPreviewState(
     val isLoading: Boolean = false,
     val lines: List<JsonLine> = emptyList(),
@@ -95,6 +96,7 @@ private interface LineEmitter {
 
 private class JsonLineEmitter : LineEmitter {
     private val maxLineChars = 4_000
+    private val maxNestedJsonStringChars = 1_000_000
     private var lineIndex = 0
     private var indent = 0
     private var expectingKey = false
@@ -155,7 +157,19 @@ private class JsonLineEmitter : LineEmitter {
                     if (isKey) {
                         if (!addStringChunks(source, index, endIndex, emitLine, JsonToken::Key)) return
                     } else {
-                        if (!addStringChunks(source, index, endIndex, emitLine, JsonToken::StringValue)) return
+                        val nestedJson = source.decodeNestedJsonStringOrNull(
+                            startIndex = index,
+                            endIndex = endIndex,
+                            maxChars = maxNestedJsonStringChars,
+                        )
+                        if (nestedJson != null) {
+                            val nestedStartIndex = nestedJson.indexOfFirstNonWhitespace()
+                            if (nestedStartIndex != -1) {
+                                scan(nestedJson, nestedStartIndex, emitLine)
+                            }
+                        } else if (!addStringChunks(source, index, endIndex, emitLine, JsonToken::StringValue)) {
+                            return
+                        }
                     }
                     index = endIndex + 1
                 }
@@ -266,6 +280,107 @@ private fun String.indexOfFirstNonWhitespace(): Int {
         if (!this[index].isWhitespace()) return index
     }
     return -1
+}
+
+private fun String.decodeNestedJsonStringOrNull(
+    startIndex: Int,
+    endIndex: Int,
+    maxChars: Int,
+): String? {
+    if (endIndex - startIndex - 1 > maxChars) return null
+    val firstContentIndex = firstUnescapedNonWhitespaceInString(startIndex + 1, endIndex)
+    val firstContent = firstContentIndex?.first ?: return null
+    if (firstContent != '{' && firstContent != '[') return null
+
+    val builder = StringBuilder(endIndex - startIndex - 1)
+    var index = startIndex + 1
+    while (index < endIndex) {
+        val char = this[index]
+        if (char == '\\' && index + 1 < endIndex) {
+            val escaped = this[index + 1]
+            when (escaped) {
+                '"', '\\', '/' -> {
+                    builder.append(escaped)
+                    index += 2
+                }
+                'b' -> {
+                    builder.append('\b')
+                    index += 2
+                }
+                'f' -> {
+                    builder.append('\u000C')
+                    index += 2
+                }
+                'n' -> {
+                    builder.append('\n')
+                    index += 2
+                }
+                'r' -> {
+                    builder.append('\r')
+                    index += 2
+                }
+                't' -> {
+                    builder.append('\t')
+                    index += 2
+                }
+                'u' -> {
+                    val decoded = unicodeEscapeOrNull(index + 2, endIndex)
+                    if (decoded == null) {
+                        builder.append(char)
+                        index++
+                    } else {
+                        builder.append(decoded)
+                        index += 6
+                    }
+                }
+                else -> {
+                    builder.append(escaped)
+                    index += 2
+                }
+            }
+        } else {
+            builder.append(char)
+            index++
+        }
+    }
+    return builder.toString()
+}
+
+private fun String.firstUnescapedNonWhitespaceInString(startIndex: Int, endIndex: Int): Pair<Char, Int>? {
+    var index = startIndex
+    while (index < endIndex) {
+        val char = this[index]
+        val decoded = if (char == '\\' && index + 1 < endIndex) {
+            when (val escaped = this[index + 1]) {
+                '"', '\\', '/' -> escaped to index + 2
+                'b' -> '\b' to index + 2
+                'f' -> '\u000C' to index + 2
+                'n' -> '\n' to index + 2
+                'r' -> '\r' to index + 2
+                't' -> '\t' to index + 2
+                'u' -> {
+                    val unicode = unicodeEscapeOrNull(index + 2, endIndex)
+                    if (unicode == null) char to index + 1 else unicode to index + 6
+                }
+                else -> escaped to index + 2
+            }
+        } else {
+            char to index + 1
+        }
+        if (!decoded.first.isWhitespace()) return decoded.first to index
+        index = decoded.second
+    }
+    return null
+}
+
+private fun String.unicodeEscapeOrNull(startIndex: Int, endIndex: Int): Char? {
+    if (startIndex + 4 > endIndex) return null
+    var value = 0
+    repeat(4) { offset ->
+        val digit = this[startIndex + offset].digitToIntOrNull(radix = 16) ?: return null
+        value = value * 16 + digit
+    }
+    return value.toChar()
 }
 
 private fun String.nextNonWhitespace(startIndex: Int): Char? {

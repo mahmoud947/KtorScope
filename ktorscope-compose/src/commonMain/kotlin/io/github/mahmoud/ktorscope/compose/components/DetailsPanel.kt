@@ -524,7 +524,7 @@ private fun EmptySection(text: String) {
     }
 }
 
-private const val InlineBodyPreviewLines = 5
+private const val InlineBodyPreviewLines = 10
 
 private data class BodyPreviewTarget(
     val title: String,

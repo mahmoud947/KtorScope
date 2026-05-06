@@ -39,7 +39,7 @@ fun App(
     MaterialTheme {
         var showInspector by remember { mutableStateOf(false) }
         val scope = rememberCoroutineScope()
-        val networkPersistence = remember { ktorScopePersistence }
+        val networkPersistence = remember {  ktorScopePersistence}
         val client = rememberSampleClient(networkPersistence.historyPersistence)
         var status by remember { mutableStateOf("Ready") }
 
