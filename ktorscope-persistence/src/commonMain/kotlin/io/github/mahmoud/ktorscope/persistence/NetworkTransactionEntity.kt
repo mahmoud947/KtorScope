@@ -6,6 +6,7 @@ package io.github.mahmoud.ktorscope.persistence
 import androidx.room.Entity
 import androidx.room.Index
 import androidx.room.PrimaryKey
+import androidx.room.ColumnInfo
 
 @Entity(
     tableName = "network_transactions",
@@ -37,5 +38,8 @@ data class NetworkTransactionEntity(
     val errorMessage: String?,
     val errorType: String?,
     val isFromCache: Boolean,
+    @ColumnInfo(defaultValue = "'HTTP'")
+    val protocol: String,
+    val webSocketFrames: String?,
     val createdAtMs: Long,
 )

@@ -6,6 +6,7 @@ package io.github.mahmoud.ktorscope.compose.components
 import androidx.compose.runtime.Immutable
 import androidx.compose.ui.graphics.Color
 import io.github.mahmoud.ktorscope.core.NetworkTransaction
+import io.github.mahmoud.ktorscope.core.WebSocketFrameInspection
 
 internal enum class TransactionFilter(val label: String) {
     All("All"),
@@ -105,6 +106,20 @@ internal fun Long.timestampLabel(): String = "$this ms"
 
 internal fun Map<String, List<String>>.headersText(): String {
     return entries.joinToString("\n") { (name, values) -> "$name: ${values.joinToString()}" }
+}
+
+internal fun List<WebSocketFrameInspection>.framesText(): String {
+    return joinToString("\n\n") { frame ->
+        buildString {
+            appendLine("#${frame.index} ${frame.direction.name.lowercase()} ${frame.type.name.lowercase()} ${frame.sizeBytes} B")
+            frame.closeCode?.let { appendLine("closeCode: $it") }
+            frame.closeReason?.takeIf { it.isNotBlank() }?.let { appendLine("closeReason: $it") }
+            frame.payload?.takeIf { it.isNotBlank() }?.let { payload ->
+                appendLine(if (frame.payloadTruncated) "payload (truncated):" else "payload:")
+                append(payload)
+            }
+        }.trimEnd()
+    }
 }
 
 internal fun String.prettyJsonOrSelf(): String {
