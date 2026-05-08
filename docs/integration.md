@@ -77,7 +77,7 @@ val client = HttpClient {
 }
 ```
 
-By default, KtorScope writes to `KtorScopeStore.shared`, captures body previews, redacts common sensitive headers, and keeps the data in memory.
+By default, KtorScope writes to `KtorScopeStore.shared`, captures body previews and WebSocket frames, redacts common sensitive headers, and keeps the data in memory.
 
 ## 3. Configure Capture Behavior
 
@@ -92,6 +92,7 @@ val client = HttpClient {
     install(KtorScope) {
         enabled = true
         captureBodies = true
+        captureWebSocketFrames = true
         maxBodySize = 128_000
         redactHeaders = setOf(
             "Authorization",
@@ -107,7 +108,36 @@ val client = HttpClient {
 
 Use a custom store when you want isolated clients, tests, or multiple inspector sessions.
 
-## 4. Optional Historical Session Persistence
+## 4. Optional WebSocket Frame Inspection
+
+If your app uses Ktor WebSockets, install Ktor's `WebSockets` plugin alongside KtorScope:
+
+```kotlin
+import io.github.mahmoud.ktorscope.ktor.KtorScope
+import io.github.mahmoud.ktorscope.core.NetworkProtocol
+import io.ktor.client.HttpClient
+import io.ktor.client.plugins.websocket.WebSockets
+import io.ktor.client.plugins.websocket.wss
+import io.ktor.websocket.Frame
+
+val client = HttpClient {
+    install(WebSockets)
+    install(KtorScope) {
+        captureWebSocketFrames = true
+        maxWebSocketFramePreviewSize = 64_000
+    }
+}
+
+suspend fun sendSampleFrame() {
+    client.wss("wss://ws.postman-echo.com/raw") {
+        send(Frame.Text("""{"type":"hello"}"""))
+    }
+}
+```
+
+Each WebSocket handshake is captured as a transaction with `protocol = NetworkProtocol.WEBSOCKET`. The details screen shows a `Frames` tab with sent and received text, binary, ping, pong, and close frames.
+
+## 5. Optional Historical Session Persistence
 
 By default, KtorScope is in-memory only. If you want historical transactions across launches, add `ktorscope-persistence`, create `KtorScopePersistence` on each platform, and pass the history adapter into the plugin.
 
@@ -153,7 +183,7 @@ val client = HttpClient {
 
 Room dependencies stay out of `ktorscope-core`, `ktorscope-ktor`, and `ktorscope-compose`. `ScopPersistenceFactory` returns both the history adapter and the body file store needed by the UI.
 
-## 5. Render the Inspector
+## 6. Render the Inspector
 
 ```kotlin
 import androidx.compose.runtime.Composable
@@ -178,7 +208,7 @@ fun DebugNetworkScreen(
 
 If you use the default `KtorScopeStore.shared`, you can omit the `store` parameter. Pass `persistHistory = true` to show the current-session, persisted-history, and all-history filters.
 
-## 6. Inspect Data Without UI
+## 7. Inspect Data Without UI
 
 ```kotlin
 import io.github.mahmoud.ktorscope.core.KtorScopeStore
@@ -189,7 +219,7 @@ val persistedTransactions = KtorScopeStore.shared.persistedTransactions.value
 
 `transactions` is a `StateFlow<List<NetworkTransaction>>`, so non-Compose code can collect it directly.
 
-## 7. Export Logs
+## 8. Export Logs
 
 ```kotlin
 import io.github.mahmoud.ktorscope.core.exportLogs
@@ -197,4 +227,4 @@ import io.github.mahmoud.ktorscope.core.exportLogs
 val report = KtorScopeStore.shared.exportLogs()
 ```
 
-The exported report includes pretty printed requests, responses, failures, cURL commands, and GraphQL details using the default export config.
+The exported report includes pretty printed requests, responses, failures, WebSocket frames, cURL commands, and GraphQL details using the default export config.

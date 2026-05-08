@@ -4,7 +4,7 @@
   <img src="docs/assets/ktorscope-logo.svg" alt="KtorScope logo" width="160" />
 </p>
 
-KtorScope is a Kotlin Multiplatform network inspector for Ktor Client. It captures requests, responses, failures, timings, headers, body previews, GraphQL metadata, cURL commands, and exportable logs, then exposes everything through a shared in-memory store and an optional Compose Multiplatform UI.
+KtorScope is a Kotlin Multiplatform network inspector for Ktor Client. It captures requests, responses, failures, timings, headers, body previews, WebSocket frames, GraphQL metadata, cURL commands, and exportable logs, then exposes everything through a shared in-memory store and an optional Compose Multiplatform UI.
 
 The project currently targets Android and iOS.
 
@@ -15,9 +15,9 @@ Current version: `1.0.0`
 | Module | Purpose |
 | --- | --- |
 | `ktorscope-core` | Shared models, store, redaction, body previews, cURL generation, GraphQL parsing, pretty printing, and log export helpers. |
-| `ktorscope-ktor` | Ktor Client plugin that records network transactions into `KtorScopeStore`. |
+| `ktorscope-ktor` | Ktor Client plugin that records HTTP transactions and WebSocket frames into `KtorScopeStore`. |
 | `ktorscope-compose` | Compose Multiplatform inspector UI, clipboard/share hooks, and transaction details screens. |
-| `ktorscope-persistence` | Optional Room KMP history persistence plus platform file storage for large bodies. |
+| `ktorscope-persistence` | Optional Room KMP history persistence plus platform file storage for large bodies and persisted WebSocket frame history. |
 
 ## Quick Start
 
@@ -74,9 +74,11 @@ import io.github.mahmoud.ktorscope.ktor.KtorScope
 import io.ktor.client.HttpClient
 
 val client = HttpClient {
+    install(WebSockets) // optional, required only when your client uses Ktor WebSockets
     install(KtorScope) {
         enabled = true
         captureBodies = true
+        captureWebSocketFrames = true
         maxBodySize = 250_000
         redactHeaders = setOf("Authorization", "Cookie", "Set-Cookie", "X-Api-Key")
         prettyPrint = true
@@ -119,8 +121,10 @@ Then pass `persistHistory = true` and `onLoadFullBody = ktorScopePersistence.bod
 - Request method, URL, headers, and supported text/byte-array request bodies.
 - Response status, headers, supported text response bodies, and request duration.
 - Failures thrown by Ktor before a response is available.
+- WebSocket handshakes plus incoming and outgoing text, binary, ping, pong, and close frames when Ktor's `WebSockets` plugin is installed.
 - Redacted sensitive headers before transactions are stored.
 - Truncated body previews using `maxBodySize`.
+- Truncated WebSocket frame payload previews using `maxWebSocketFramePreviewSize`.
 - GraphQL operation type, operation name, query, and variables for common JSON GraphQL request bodies.
 - cURL commands and pretty printed log reports.
 

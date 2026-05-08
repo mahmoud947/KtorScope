@@ -52,16 +52,39 @@ data class NetworkTransaction(
     val error: NetworkError? = null,
     val durationMillis: Long? = null,
     val createdAtMillis: Long,
+    val protocol: NetworkProtocol = NetworkProtocol.HTTP,
+    val webSocketFrames: List<WebSocketFrameInspection> = emptyList(),
 )
 ```
 
 `NetworkTransaction.isFailed` returns `true` when an error was captured.
+
+`NetworkTransaction.isWebSocket` returns `true` when `protocol == NetworkProtocol.WEBSOCKET`.
 
 `NetworkRequest` includes method, URL, headers, optional body preview, and `bodyTruncated`.
 
 `NetworkResponse` includes status, headers, optional body preview, and `bodyTruncated`.
 
 `NetworkError` includes type, message, and optional stack trace.
+
+WebSocket frames are represented by `WebSocketFrameInspection`:
+
+```kotlin
+data class WebSocketFrameInspection(
+    val index: Int,
+    val direction: WebSocketFrameDirection,
+    val type: WebSocketFrameType,
+    val timestampMillis: Long,
+    val sizeBytes: Long,
+    val payload: String? = null,
+    val payloadTruncated: Boolean = false,
+    val fin: Boolean = true,
+    val closeCode: Long? = null,
+    val closeReason: String? = null,
+)
+```
+
+Frame direction is `INCOMING` or `OUTGOING`. Frame type is `TEXT`, `BINARY`, `CLOSE`, `PING`, or `PONG`.
 
 ## cURL
 
@@ -102,7 +125,7 @@ val reportFromStore = store.exportLogs()
 val reportFromList = transactions.exportKtorScopeLogs()
 ```
 
-The default export config includes headers, bodies, cURL commands, GraphQL details, and pretty JSON formatting.
+The default export config includes headers, bodies, WebSocket frame summaries, cURL commands, GraphQL details, and pretty JSON formatting.
 
 ## GraphQL
 

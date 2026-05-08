@@ -73,7 +73,11 @@ KtorScopeScreen(
 )
 ```
 
-The UI can share all filtered logs from the list screen or a single transaction from the details screen.
+The UI can share all filtered logs from the list screen or a single transaction from the details screen. WebSocket transaction exports include captured frame summaries and payload previews.
+
+## WebSocket Frames
+
+When a transaction was captured from a Ktor WebSocket session, the details screen adds a `Frames` tab. The tab shows frame order, direction, type, payload size, close metadata, and a text or hex payload preview. The summary card also shows the current frame count so live sessions are easy to spot.
 
 ## Layout
 

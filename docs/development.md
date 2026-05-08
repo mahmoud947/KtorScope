@@ -3,12 +3,12 @@
 ## Project Layout
 
 ```text
-ktorscope-core/       Shared models, store, redaction, formatting, export helpers
-ktorscope-ktor/       Ktor Client plugin
-ktorscope-compose/    Compose Multiplatform inspector UI
+ktorscope-core/        Shared models, store, redaction, formatting, export helpers
+ktorscope-ktor/        Ktor Client plugin
+ktorscope-compose/     Compose Multiplatform inspector UI
 ktorscope-persistence/ Optional Room KMP history persistence and body file storage
-composeApp/           Android/iOS sample app using the library modules
-iosApp/               iOS app shell
+composeApp/            Android/iOS sample app using the library modules
+iosApp/                iOS app shell
 ```
 
 ## Common Commands
@@ -37,6 +37,7 @@ Run checks for a single module:
 - Keep Ktor-specific interception logic in `ktorscope-ktor`.
 - Keep UI, clipboard, and share behavior in `ktorscope-compose`.
 - Use `KtorScopeStore` as the handoff between capture and presentation.
+- Keep WebSocket frame model changes compatible with persistence schemas and Compose details rendering.
 
 ## Publishing Notes
 
