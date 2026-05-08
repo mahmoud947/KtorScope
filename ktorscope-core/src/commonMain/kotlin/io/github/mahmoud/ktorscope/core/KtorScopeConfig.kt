@@ -12,6 +12,8 @@ data class KtorScopeConfig(
     val persistHistory: Boolean = false,
     val maxHistoryRecords: Int = 500,
     val maxBodyPreviewSize: Long = DEFAULT_MAX_BODY_PREVIEW_SIZE,
+    val captureWebSocketFrames: Boolean = true,
+    val maxWebSocketFramePreviewSize: Long = DEFAULT_MAX_WEBSOCKET_FRAME_PREVIEW_SIZE,
     val largeBodyFileThreshold: Long = DEFAULT_LARGE_BODY_FILE_THRESHOLD,
     val redactHeaders: Set<String> = DEFAULT_REDACT_HEADERS,
     val store: KtorScopeStore = KtorScopeStore.shared,
@@ -23,6 +25,7 @@ data class KtorScopeConfig(
     companion object {
         const val DEFAULT_MAX_BODY_SIZE: Int = 250_000
         const val DEFAULT_MAX_BODY_PREVIEW_SIZE: Long = 250_000
+        const val DEFAULT_MAX_WEBSOCKET_FRAME_PREVIEW_SIZE: Long = 64_000
         const val DEFAULT_LARGE_BODY_FILE_THRESHOLD: Long = 250_000
 
         val DEFAULT_REDACT_HEADERS: Set<String> = setOf(

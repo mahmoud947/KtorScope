@@ -27,6 +27,7 @@ fun createNetworkInspectorDatabase(
 ): NetworkInspectorDatabase {
     return createNetworkInspectorDatabaseBuilder(context, databaseName)
         .setDriver(BundledSQLiteDriver())
+        .addMigrations(NetworkInspectorMigration1To2)
         .setQueryCoroutineContext(Dispatchers.Default)
         .build()
 }

@@ -4,6 +4,7 @@
 package io.github.mahmoud.ktorscope.persistence
 
 import io.github.mahmoud.ktorscope.core.NetworkError
+import io.github.mahmoud.ktorscope.core.NetworkProtocol
 import io.github.mahmoud.ktorscope.core.NetworkRequest
 import io.github.mahmoud.ktorscope.core.NetworkResponse
 import io.github.mahmoud.ktorscope.core.NetworkTransaction
@@ -37,6 +38,8 @@ internal class NetworkTransactionEntityMapper(
             errorMessage = transaction.error?.message,
             errorType = transaction.error?.type,
             isFromCache = transaction.isFromCache,
+            protocol = transaction.protocol.name,
+            webSocketFrames = WebSocketFramesCodec.encode(transaction.webSocketFrames),
             createdAtMs = transaction.createdAtMillis,
         )
     }
@@ -73,6 +76,8 @@ internal class NetworkTransactionEntityMapper(
             durationMillis = entity.durationMs,
             createdAtMillis = entity.timestampMs,
             isFromCache = entity.isFromCache,
+            protocol = runCatching { NetworkProtocol.valueOf(entity.protocol) }.getOrDefault(NetworkProtocol.HTTP),
+            webSocketFrames = WebSocketFramesCodec.decode(entity.webSocketFrames),
         )
     }
 

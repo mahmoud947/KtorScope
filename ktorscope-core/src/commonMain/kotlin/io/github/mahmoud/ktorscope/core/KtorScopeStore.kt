@@ -71,6 +71,31 @@ class KtorScopeStore(
         }
     }
 
+    fun updateTransaction(
+        id: String,
+        transform: (NetworkTransaction) -> NetworkTransaction,
+    ) {
+        var updatedTransaction: NetworkTransaction? = null
+        _transactions.update { current ->
+            current.map { transaction ->
+                if (transaction.id == id) {
+                    transform(transaction).also { updatedTransaction = it }
+                } else {
+                    transaction
+                }
+            }
+        }
+        val transaction = updatedTransaction ?: return
+        if (persistHistory) {
+            scope.launch {
+                runCatching {
+                    persistence.saveTransaction(transaction)
+                    persistence.trimToMaxRecords(maxHistoryRecords)
+                }
+            }
+        }
+    }
+
     fun clear() {
         _transactions.value = emptyList()
         if (persistHistory) {

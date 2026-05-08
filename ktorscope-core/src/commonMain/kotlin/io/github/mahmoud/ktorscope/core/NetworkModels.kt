@@ -14,9 +14,22 @@ data class NetworkTransaction(
     val durationMillis: Long? = null,
     val createdAtMillis: Long,
     val isFromCache: Boolean = false,
+    val protocol: NetworkProtocol = NetworkProtocol.HTTP,
+    val webSocketFrames: List<WebSocketFrameInspection> = emptyList(),
 ) {
     val isFailed: Boolean
         get() = error != null
+
+    val isWebSocket: Boolean
+        get() = protocol == NetworkProtocol.WEBSOCKET
+}
+
+/**
+ * Captured network protocol family.
+ */
+enum class NetworkProtocol {
+    HTTP,
+    WEBSOCKET,
 }
 
 /**
@@ -52,4 +65,39 @@ data class NetworkError(
     val type: String,
     val message: String?,
     val stackTrace: String? = null,
+)
+
+/**
+ * Direction of an inspected WebSocket frame relative to the client.
+ */
+enum class WebSocketFrameDirection {
+    INCOMING,
+    OUTGOING,
+}
+
+/**
+ * Captured WebSocket frame kind.
+ */
+enum class WebSocketFrameType {
+    TEXT,
+    BINARY,
+    CLOSE,
+    PING,
+    PONG,
+}
+
+/**
+ * A single WebSocket frame observed on an upgraded connection.
+ */
+data class WebSocketFrameInspection(
+    val index: Int,
+    val direction: WebSocketFrameDirection,
+    val type: WebSocketFrameType,
+    val timestampMillis: Long,
+    val sizeBytes: Long,
+    val payload: String? = null,
+    val payloadTruncated: Boolean = false,
+    val fin: Boolean = true,
+    val closeCode: Long? = null,
+    val closeReason: String? = null,
 )

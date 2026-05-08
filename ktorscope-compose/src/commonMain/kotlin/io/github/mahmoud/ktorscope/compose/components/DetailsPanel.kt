@@ -59,6 +59,8 @@ import io.github.mahmoud.ktorscope.compose.KtorScopeTheme
 import io.github.mahmoud.ktorscope.compose.KtorScopeThemeMode
 import io.github.mahmoud.ktorscope.core.KtorScopeExportConfig
 import io.github.mahmoud.ktorscope.core.NetworkTransaction
+import io.github.mahmoud.ktorscope.core.WebSocketFrameDirection
+import io.github.mahmoud.ktorscope.core.WebSocketFrameInspection
 import io.github.mahmoud.ktorscope.core.exportKtorScopeLogs
 import io.github.mahmoud.ktorscope.core.graphQlOperation
 import io.github.mahmoud.ktorscope.core.toCurlCommand
@@ -99,6 +101,9 @@ internal fun DetailsPanel(
             Tab(selected = selectedTab == 0, onClick = { selectedTab = 0 }, text = { Text("Request") })
             Tab(selected = selectedTab == 1, onClick = { selectedTab = 1 }, text = { Text("Response") })
             Tab(selected = selectedTab == 2, onClick = { selectedTab = 2 }, text = { Text("Error") })
+            if (transaction.isWebSocket) {
+                Tab(selected = selectedTab == 3, onClick = { selectedTab = 3 }, text = { Text("Frames") })
+            }
         }
         Column(
             Modifier.weight(1f).verticalScroll(rememberScrollState()),
@@ -151,6 +156,7 @@ internal fun DetailsPanel(
                         }
                     }
                 }
+                3 -> WebSocketFramesSection(transaction.webSocketFrames, onCopy)
             }
         }
     }
@@ -191,6 +197,9 @@ private fun SummaryCard(
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 MethodChip(transaction.request.method)
                 StatusChip(transaction)
+                if (transaction.isWebSocket) {
+                    AssistChip(onClick = {}, label = { Text("${transaction.webSocketFrames.size} frames") })
+                }
                 transaction.durationMillis?.let { AssistChip(onClick = {}, label = { Text("${it}ms") }) }
                 Spacer(Modifier.weight(1f))
                 IconButton(
@@ -219,6 +228,66 @@ private fun SummaryCard(
                     Text("Copy cURL")
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun WebSocketFramesSection(
+    frames: List<WebSocketFrameInspection>,
+    onCopy: (String) -> Unit,
+) {
+    SectionCard("WebSocket frames", action = {
+        TextButton(
+            enabled = frames.isNotEmpty(),
+            onClick = { onCopy(frames.framesText()) },
+        ) {
+            Text("Copy")
+        }
+    }) {
+        if (frames.isEmpty()) {
+            Text("No frames captured yet", color = MaterialTheme.colorScheme.onSurfaceVariant)
+            return@SectionCard
+        }
+        frames.forEach { frame ->
+            FrameRow(frame)
+        }
+    }
+}
+
+@Composable
+private fun FrameRow(frame: WebSocketFrameInspection) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(
+                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f),
+                shape = RoundedCornerShape(10.dp),
+            )
+            .padding(10.dp),
+        verticalArrangement = Arrangement.spacedBy(6.dp),
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            val direction = if (frame.direction == WebSocketFrameDirection.OUTGOING) "Sent" else "Received"
+            Text("#${frame.index}", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold)
+            AssistChip(onClick = {}, label = { Text(direction) })
+            AssistChip(onClick = {}, label = { Text(frame.type.name.lowercase()) })
+            Text("${frame.sizeBytes} B", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        if (frame.closeCode != null || !frame.closeReason.isNullOrBlank()) {
+            Text(
+                "Close ${frame.closeCode ?: ""} ${frame.closeReason.orEmpty()}".trim(),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        frame.payload?.takeIf { it.isNotBlank() }?.let { payload ->
+            Text(
+                text = if (frame.payloadTruncated) "$payload\n[truncated]" else payload,
+                style = MaterialTheme.typography.bodySmall,
+                fontFamily = FontFamily.Monospace,
+                color = MaterialTheme.colorScheme.onSurface,
+            )
         }
     }
 }

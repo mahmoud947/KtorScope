@@ -10,7 +10,7 @@ import androidx.room.RoomDatabaseConstructor
 
 @Database(
     entities = [NetworkTransactionEntity::class],
-    version = 1,
+    version = 2,
     exportSchema = true,
 )
 @ConstructedBy(NetworkInspectorDatabaseConstructor::class)

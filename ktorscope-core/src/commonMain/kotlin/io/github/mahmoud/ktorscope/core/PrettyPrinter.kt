@@ -62,6 +62,23 @@ fun NetworkTransaction.prettyPrint(
         capturedError.stackTrace?.takeIf { it.isNotBlank() }?.let { appendBlock("stackTrace", it) }
     }
 
+    if (webSocketFrames.isNotEmpty()) {
+        appendLine()
+        appendLine("WebSocket frames")
+        appendLine("----------------")
+        webSocketFrames.forEach { frame ->
+            appendLine(
+                "#${frame.index} ${frame.direction.name.lowercase()} ${frame.type.name.lowercase()} " +
+                    "${frame.sizeBytes}B at ${frame.timestampMillis}",
+            )
+            frame.closeCode?.let { appendLine("  closeCode: $it") }
+            frame.closeReason?.takeIf { it.isNotBlank() }?.let { appendLine("  closeReason: $it") }
+            frame.payload?.takeIf { it.isNotBlank() }?.let { payload ->
+                appendBlock(if (frame.payloadTruncated) "  payload (truncated)" else "  payload", payload)
+            }
+        }
+    }
+
     if (config.includeCurl) {
         appendLine()
         appendLine("cURL")
