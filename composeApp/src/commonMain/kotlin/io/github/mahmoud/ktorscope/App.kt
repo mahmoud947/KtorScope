@@ -49,6 +49,8 @@ import io.github.mahmoud947.composeapp.generated.resources.ktorscope_logo
 import io.ktor.client.HttpClient
 import io.ktor.client.call.body
 import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
+import io.ktor.client.plugins.websocket.WebSockets
+import io.ktor.client.plugins.websocket.wss
 import io.ktor.client.request.delete
 import io.ktor.client.request.get
 import io.ktor.client.request.header
@@ -58,6 +60,10 @@ import io.ktor.client.request.put
 import io.ktor.client.request.setBody
 import io.ktor.http.ContentType
 import io.ktor.http.contentType
+import io.ktor.websocket.Frame
+import io.ktor.websocket.readBytes
+import io.ktor.websocket.readText
+import kotlinx.coroutines.withTimeout
 import kotlinx.coroutines.launch
 import org.jetbrains.compose.resources.painterResource
 
@@ -272,6 +278,11 @@ fun App(
                                 }
                             }
                         },
+                        onWebSocket = {
+                            scope.launch {
+                                status = runSampleWebSocket(client)
+                            }
+                        },
                     )
                     CapturePreview(status = status, colors = sampleColors)
                 }
@@ -287,9 +298,12 @@ private fun rememberSampleClient(
     return remember(persistence) {
         HttpClient {
             install(ContentNegotiation)
+            install(WebSockets)
             install(KtorScope) {
                 enabled = true
                 captureBodies = true
+                captureWebSocketFrames = true
+                maxWebSocketFramePreviewSize = 64_000
                 maxBodySize = 250_000
                 historyPersistence {
                     enabled = true
@@ -322,6 +336,7 @@ private fun RequestButtons(
     onPatch: () -> Unit,
     onDelete: () -> Unit,
     onGraphQl: () -> Unit,
+    onWebSocket: () -> Unit,
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.padding(16.dp)) {
         SectionHeader(
@@ -408,6 +423,15 @@ private fun RequestButtons(
             accent = Color(0xFFFF8BD1),
             colors = colors,
             onClick = onGraphQl,
+            modifier = Modifier.fillMaxWidth(),
+        )
+        RequestAction(
+            method = "WS",
+            title = "WebSocket echo",
+            subtitle = "Handshake, sent frames, received echoes",
+            accent = Color(0xFF38BDF8),
+            colors = colors,
+            onClick = onWebSocket,
             modifier = Modifier.fillMaxWidth(),
         )
     }
@@ -735,5 +759,28 @@ private suspend fun runSampleCall(block: suspend () -> String): String {
         "Request finished. Open KtorScope to inspect it."
     }.getOrElse { cause ->
         "Request failed: ${cause.message.orEmpty()}"
+    }
+}
+
+private suspend fun runSampleWebSocket(client: HttpClient): String {
+    return runCatching {
+        var textEcho = ""
+        var binaryEchoBytes = 0
+        client.wss("wss://ws.postman-echo.com/raw") {
+            val textMessage = """{"source":"KtorScope","kind":"text-frame","value":"hello websocket"}"""
+            send(Frame.Text(textMessage))
+            textEcho = withTimeout(5_000) {
+                (incoming.receive() as? Frame.Text)?.readText().orEmpty()
+            }
+
+            val binaryMessage = "KtorScope binary frame".encodeToByteArray()
+            send(Frame.Binary(fin = true, data = binaryMessage))
+            binaryEchoBytes = withTimeout(5_000) {
+                incoming.receive().readBytes().size
+            }
+        }
+        "WebSocket echoed ${textEcho.length} text chars and $binaryEchoBytes binary bytes. Open KtorScope frames."
+    }.getOrElse { cause ->
+        "WebSocket failed: ${cause.message.orEmpty()}"
     }
 }

@@ -22,6 +22,7 @@ import io.github.mahmoud.ktorscope.core.WebSocketFrameType
 import io.github.mahmoud.ktorscope.core.prettyPrint
 import io.github.mahmoud.ktorscope.core.toBodyPreview
 import io.ktor.client.plugins.websocket.ClientWebSocketSession
+import io.ktor.client.plugins.websocket.DefaultClientWebSocketSession
 import io.ktor.client.plugins.api.ClientPlugin
 import io.ktor.client.plugins.api.Send
 import io.ktor.client.plugins.api.SendingRequest
@@ -41,9 +42,13 @@ import io.ktor.http.content.TextContent
 import io.ktor.util.AttributeKey
 import io.ktor.util.date.getTimeMillis
 import io.ktor.websocket.Frame
+import io.ktor.websocket.CloseReason
+import io.ktor.websocket.DefaultWebSocketSession
 import io.ktor.websocket.WebSocketExtension
 import io.ktor.websocket.readReason
+import io.ktor.utils.io.InternalAPI
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.channels.ReceiveChannel
 import kotlinx.coroutines.channels.SendChannel
@@ -201,20 +206,33 @@ val KtorScope: ClientPlugin<KtorScopePluginConfig> = createClientPlugin(
             }
         }
 
-        val inspectedSession = InspectingClientWebSocketSession(
-            delegate = session,
-            maxFramePreviewSize = config.maxWebSocketFramePreviewSize.toPreviewSize(),
-            onFrame = { frame ->
-                config.store.updateTransaction(transactionId) { transaction ->
-                    transaction.copy(
-                        durationMillis = getTimeMillis() - startedAt,
-                        webSocketFrames = transaction.webSocketFrames + frame.copy(
-                            index = transaction.webSocketFrames.size + 1,
-                        ),
-                    )
-                }
-            },
-        )
+        val maxFramePreviewSize = config.maxWebSocketFramePreviewSize.toPreviewSize()
+        val onFrame: (WebSocketFrameInspection) -> Unit = { frame ->
+            config.store.updateTransaction(transactionId) { transaction ->
+                transaction.copy(
+                    durationMillis = getTimeMillis() - startedAt,
+                    webSocketFrames = transaction.webSocketFrames + frame.copy(
+                        index = transaction.webSocketFrames.size + 1,
+                    ),
+                )
+            }
+        }
+        val inspectedSession = if (session is DefaultClientWebSocketSession) {
+            DefaultClientWebSocketSession(
+                call = session.call,
+                delegate = InspectingDefaultWebSocketSession(
+                    delegate = session,
+                    maxFramePreviewSize = maxFramePreviewSize,
+                    onFrame = onFrame,
+                ),
+            )
+        } else {
+            InspectingClientWebSocketSession(
+                delegate = session,
+                maxFramePreviewSize = maxFramePreviewSize,
+                onFrame = onFrame,
+            )
+        }
         proceedWith(HttpResponseContainer(container.expectedType, inspectedSession))
     }
 }
@@ -287,6 +305,64 @@ class KtorScopePluginConfig {
                 legacyConfig
             }
         }
+}
+
+@OptIn(ExperimentalCoroutinesApi::class)
+private class InspectingDefaultWebSocketSession(
+    private val delegate: DefaultWebSocketSession,
+    private val maxFramePreviewSize: Int,
+    private val onFrame: (WebSocketFrameInspection) -> Unit,
+) : DefaultWebSocketSession, CoroutineScope by delegate {
+    override var masking: Boolean
+        get() = delegate.masking
+        set(value) {
+            delegate.masking = value
+        }
+    override var maxFrameSize: Long
+        get() = delegate.maxFrameSize
+        set(value) {
+            delegate.maxFrameSize = value
+        }
+    override var pingIntervalMillis: Long
+        get() = delegate.pingIntervalMillis
+        set(value) {
+            delegate.pingIntervalMillis = value
+        }
+    override var timeoutMillis: Long
+        get() = delegate.timeoutMillis
+        set(value) {
+            delegate.timeoutMillis = value
+        }
+    override val closeReason: Deferred<CloseReason?>
+        get() = delegate.closeReason
+    override val extensions: List<WebSocketExtension<*>>
+        get() = delegate.extensions
+    override val incoming: ReceiveChannel<Frame> = produce {
+        for (frame in delegate.incoming) {
+            onFrame(frame.toInspection(WebSocketFrameDirection.INCOMING, maxFramePreviewSize))
+            send(frame)
+        }
+    }
+    override val outgoing: SendChannel<Frame> = InspectingSendChannel(
+        delegate = delegate.outgoing,
+        maxFramePreviewSize = maxFramePreviewSize,
+        onFrame = onFrame,
+    )
+
+    @OptIn(InternalAPI::class)
+    override fun start(negotiatedExtensions: List<WebSocketExtension<*>>) {
+        delegate.start(negotiatedExtensions)
+    }
+
+    override suspend fun flush() {
+        delegate.flush()
+    }
+
+    @Deprecated("Use cancel() instead.", level = DeprecationLevel.ERROR)
+    @Suppress("DEPRECATION_ERROR")
+    override fun terminate() {
+        delegate.cancel()
+    }
 }
 
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -372,7 +448,7 @@ private fun Frame.toInspection(
             is Frame.Close -> WebSocketFrameType.CLOSE
             is Frame.Ping -> WebSocketFrameType.PING
             is Frame.Pong -> WebSocketFrameType.PONG
-            else -> {WebSocketFrameType.CLOSE}
+            else -> WebSocketFrameType.CLOSE
         },
         timestampMillis = getTimeMillis(),
         sizeBytes = data.size.toLong(),
