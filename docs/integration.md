@@ -2,7 +2,7 @@
 
 This guide shows the smallest useful KtorScope setup for a Kotlin Multiplatform app.
 
-Current version: `1.1.0`
+Current version: `1.2.0`
 
 ## 1. Add Dependencies
 
@@ -10,10 +10,10 @@ For external apps, consume the published artifacts:
 
 ```kotlin
 commonMain.dependencies {
-    implementation("io.github.mahmoud947:ktorscope-core:1.1.0")
-    implementation("io.github.mahmoud947:ktorscope-ktor:1.1.0")
-    implementation("io.github.mahmoud947:ktorscope-compose:1.1.0")
-    implementation("io.github.mahmoud947:ktorscope-persistence:1.1.0")
+    implementation("io.github.mahmoud947:ktorscope-core:1.2.0")
+    implementation("io.github.mahmoud947:ktorscope-ktor:1.2.0")
+    implementation("io.github.mahmoud947:ktorscope-compose:1.2.0")
+    implementation("io.github.mahmoud947:ktorscope-persistence:1.2.0")
 }
 ```
 
@@ -21,7 +21,7 @@ If you use a Gradle version catalog, add the modules to `gradle/libs.versions.to
 
 ```toml
 [versions]
-ktorscope = "1.1.0"
+ktorscope = "1.2.0"
 
 [libraries]
 ktorscope-core = { module = "io.github.mahmoud947:ktorscope-core", version.ref = "ktorscope" }
