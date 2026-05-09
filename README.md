@@ -145,13 +145,11 @@ Build all library modules:
 ./gradlew :ktorscope-core:build :ktorscope-ktor:build :ktorscope-compose:build :ktorscope-persistence:build
 ```
 
-## Publishing
+## Video
 
-KtorScope uses the same Maven Central publishing setup as KPDF. Set `VERSION_NAME` in `gradle.properties`, configure the Maven Central and signing credentials expected by the Vanniktech Maven Publish plugin, then publish all library modules together:
 
-```shell
-./gradlew publishToMavenCentral
-```
+https://github.com/user-attachments/assets/1426b17f-b1d2-42b0-8dc8-f9f7ed3a97e9
+
 
 ## License
 
