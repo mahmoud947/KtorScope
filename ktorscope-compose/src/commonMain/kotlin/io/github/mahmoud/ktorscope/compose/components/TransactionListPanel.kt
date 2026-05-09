@@ -3,12 +3,15 @@ package io.github.mahmoud.ktorscope.compose.components
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.Crossfade
 import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
@@ -455,20 +458,33 @@ private fun TransactionCard(
         transaction.bodySizeLabel()
     }
 
-    val background by animateColorAsState(
+    val borderColor by animateColorAsState(
         targetValue = if (selected) {
-            MaterialTheme.colorScheme.primary.copy(alpha = 0.10f)
+            MaterialTheme.colorScheme.primary
         } else {
-            MaterialTheme.colorScheme.surface
+
+            MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f)
         },
-        label = "cardColor",
+        label = "cardBorderColor",
     )
+
+    val borderWidth by animateDpAsState(
+
+        targetValue = if (selected) 1.5.dp else 1.dp,
+
+        label = "cardBorderWidth",
+
+        )
 
     ElevatedCard(
         modifier = Modifier
             .fillMaxWidth()
+            .border(
+                width = borderWidth,
+                color = borderColor,
+            )
             .clickable(onClick = onClick),
-        colors = CardDefaults.elevatedCardColors(containerColor = background),
+        colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surface),
         elevation = CardDefaults.elevatedCardElevation(
             defaultElevation = if (selected) 7.dp else 2.dp,
         ),
